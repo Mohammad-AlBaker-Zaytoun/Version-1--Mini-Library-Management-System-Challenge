@@ -23,12 +23,11 @@ export const metadata: Metadata = {
     template: '%s | Mini Library Management System',
   },
   description:
-    'Mobile-first library management platform with Firebase Auth, Firestore circulation workflows, role-based access, and AI-powered insights.',
-  keywords: ['library management', 'next.js', 'mobile-first', 'seo', 'dashboard', 'catalog'],
+    'Mobile-first library management system with Firebase auth, role-based access, circulation, AI metadata enrichment, and analytics.',
   openGraph: {
     title: 'Mini Library Management System',
     description:
-      'Interview-ready Next.js library system with Google SSO, circulation tracking, analytics, and practical AI features.',
+      'Interview-ready Next.js library platform with Google SSO, Firestore, AI catalog assistant, and analytics.',
     url: appUrl,
     siteName: 'Mini Library Management System',
     type: 'website',
@@ -37,7 +36,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Mini Library Management System',
     description:
-      'Next.js + Firebase library platform with RBAC, checkout/checkin workflows, and AI-assisted recommendations.',
+      'Next.js + Firebase library platform with circulation workflows, RBAC, and AI-assisted cataloging.',
   },
   alternates: {
     canonical: '/',
