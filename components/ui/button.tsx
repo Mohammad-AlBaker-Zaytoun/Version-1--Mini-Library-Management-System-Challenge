@@ -8,6 +8,8 @@ type ButtonSize = 'sm' | 'md';
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;
+  loading?: boolean;
+  loadingText?: string;
 }
 
 const variantClassName: Record<ButtonVariant, string> = {
@@ -29,14 +31,29 @@ export function Button({
   variant = 'primary',
   size = 'md',
   type = 'button',
+  loading = false,
+  loadingText,
+  children,
+  disabled,
   ...props
 }: ButtonProps) {
   return (
     <button
       type={type}
       className={buttonClassName({ variant, size, className })}
+      aria-busy={loading || undefined}
+      disabled={disabled || loading}
       {...props}
-    />
+    >
+      {loading ? (
+        <span className="inline-flex items-center gap-2">
+          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" />
+          {loadingText ?? children}
+        </span>
+      ) : (
+        children
+      )}
+    </button>
   );
 }
 

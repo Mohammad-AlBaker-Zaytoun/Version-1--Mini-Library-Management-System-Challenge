@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
 import { ChartNoAxesCombined, Sparkles } from 'lucide-react';
+import { redirect } from 'next/navigation';
 
 import { PublicAppShell } from '@/components/layout/public-app-shell';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getSessionUser } from '@/lib/auth/api-auth';
 
 export const metadata: Metadata = {
   title: 'Dashboard',
@@ -14,7 +16,12 @@ export const metadata: Metadata = {
   },
 };
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const user = await getSessionUser();
+  if (!user) {
+    redirect('/login');
+  }
+
   return (
     <PublicAppShell
       pageTitle="Dashboard and Analytics Scaffold"

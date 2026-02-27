@@ -1,15 +1,18 @@
 'use client';
 
-import { BookOpenText, ChartNoAxesCombined, History, LogIn } from 'lucide-react';
+import { BookOpenText, ChartNoAxesCombined, History, LogIn, LogOut, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type React from 'react';
+import { useState } from 'react';
 
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/components/providers/auth-provider';
 import { cn } from '@/lib/utils';
 
-type NavRoute = '/catalog' | '/history' | '/dashboard' | '/login';
+type NavRoute = '/catalog' | '/history' | '/dashboard' | '/admin';
 
-const navItems: Array<{
+const memberNavItems: Array<{
   href: NavRoute;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
@@ -17,8 +20,9 @@ const navItems: Array<{
   { href: '/catalog', label: 'Catalog', icon: BookOpenText },
   { href: '/history', label: 'History', icon: History },
   { href: '/dashboard', label: 'Dashboard', icon: ChartNoAxesCombined },
-  { href: '/login', label: 'Sign in', icon: LogIn },
 ];
+
+const adminNavItem = { href: '/admin', label: 'Admin', icon: ShieldCheck } as const;
 
 interface PublicAppShellProps {
   pageTitle: string;
@@ -28,6 +32,23 @@ interface PublicAppShellProps {
 
 export function PublicAppShell({ pageTitle, pageDescription, children }: PublicAppShellProps) {
   const pathname = usePathname();
+  const { profile, signOutUser } = useAuth();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  const navItems = profile?.role === 'admin' ? [...memberNavItems, adminNavItem] : memberNavItems;
+
+  async function handleSignOut() {
+    if (isSigningOut) {
+      return;
+    }
+
+    setIsSigningOut(true);
+    try {
+      await signOutUser();
+    } finally {
+      setIsSigningOut(false);
+    }
+  }
 
   return (
     <div className="relative min-h-screen bg-[var(--surface-bg)]">
@@ -41,9 +62,31 @@ export function PublicAppShell({ pageTitle, pageDescription, children }: PublicA
             >
               Mini Library Management
             </Link>
-            <span className="rounded-full bg-[var(--surface-muted)] px-2 py-1 text-xs font-medium text-[var(--text-secondary)]">
-              UI + SEO Scaffold
-            </span>
+            {profile ? (
+              <div className="flex items-center gap-2">
+                <span className="hidden rounded-full bg-[var(--surface-muted)] px-2 py-1 text-xs font-medium text-[var(--text-secondary)] sm:inline-flex">
+                  {profile.displayName} | {profile.role}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void handleSignOut()}
+                  loading={isSigningOut}
+                  loadingText="Signing out..."
+                >
+                  <LogOut className="mr-1 h-4 w-4" />
+                  Sign out
+                </Button>
+              </div>
+            ) : (
+              <Link
+                href="/login"
+                className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-muted)] px-2.5 py-1 text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-strong)]"
+              >
+                <LogIn className="h-3.5 w-3.5" />
+                Sign in
+              </Link>
+            )}
           </div>
           <nav className="mt-3 flex gap-2 overflow-x-auto pb-1">
             {navItems.map((item) => {
