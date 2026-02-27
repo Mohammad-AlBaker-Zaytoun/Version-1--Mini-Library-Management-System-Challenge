@@ -4,7 +4,7 @@
 
 Interview-focused, incremental implementation of a mobile-first library platform built with Next.js, Firebase, and practical AI features.
 
-Current status: **PR20 App Shell Refresh**.
+Current status: **PR21 SEO Alignment**.
 
 ## Goals
 
@@ -173,6 +173,7 @@ erDiagram
 18. `chore/18-admin-route-cleanup`
 19. `chore/19-protected-page-metadata-guards`
 20. `chore/20-app-shell-refresh`
+21. `chore/21-seo-alignment`
 
 ## Environment Variables
 

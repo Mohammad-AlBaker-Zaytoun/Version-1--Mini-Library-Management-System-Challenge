@@ -12,7 +12,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = new Date();
 
   return [
-    // Keep sitemap scoped to indexable public pages.
+    // Keep sitemap limited to public, indexable routes.
     { url: `${baseUrl}/`, changeFrequency: 'monthly', priority: 1, lastModified },
     { url: `${baseUrl}/login`, changeFrequency: 'monthly', priority: 0.5, lastModified },
   ];
