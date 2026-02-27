@@ -11,10 +11,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     await requireApiUser(request);
 
+    const tags =
+      request.nextUrl.searchParams
+        .get('tags')
+        ?.split(',')
+        .map((tag) => tag.trim())
+        .filter(Boolean) ?? [];
+
     const parsedQuery = booksQuerySchema.safeParse({
       q: request.nextUrl.searchParams.get('q') ?? undefined,
       author: request.nextUrl.searchParams.get('author') ?? undefined,
       genre: request.nextUrl.searchParams.get('genre') ?? undefined,
+      tags,
       availability: request.nextUrl.searchParams.get('availability') ?? undefined,
       page: request.nextUrl.searchParams.get('page') ?? undefined,
       limit: request.nextUrl.searchParams.get('limit') ?? undefined,
