@@ -2,7 +2,7 @@
 
 Incremental, interview-focused project scaffold for building a mobile-first library platform with Next.js + Firebase + AI.
 
-Current status: **PR1 foundation baseline** (project setup + docs + env contract).
+Current status: **PR2 UI + SEO scaffold** (mobile-first app shell, responsive placeholder pages, robots/sitemap, enriched metadata).
 
 ## Goals
 
@@ -18,13 +18,25 @@ Current status: **PR1 foundation baseline** (project setup + docs + env contract
 - Gemini API features
 - Vercel deployment
 
-## Current Scope (PR1)
+## Current Scope (PR2)
 
 - Next.js project initialized
 - Tailwind CSS + global theme tokens
 - TypeScript strict config
 - ESLint + Prettier setup
 - `.env.example` contract added
+- Mobile-first app shell and route scaffolds:
+  - `/`
+  - `/login`
+  - `/catalog`
+  - `/dashboard`
+  - `/history`
+- SEO baseline:
+  - root and per-page metadata
+  - OpenGraph/Twitter cards
+  - canonical tags
+  - `app/robots.ts`
+  - `app/sitemap.ts`
 - README with architecture + branch strategy
 
 ## Architecture (Target)

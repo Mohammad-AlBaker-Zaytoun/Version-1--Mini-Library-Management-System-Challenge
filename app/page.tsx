@@ -1,16 +1,35 @@
+import Link from 'next/link';
+
+import { PublicAppShell } from '@/components/layout/public-app-shell';
+import { Badge } from '@/components/ui/badge';
+import { buttonClassName } from '@/components/ui/button';
+import { Card, CardDescription, CardTitle } from '@/components/ui/card';
+
 export default function HomePage() {
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col items-start justify-center gap-4 px-5 py-14 sm:px-8">
-      <p className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-secondary)]">
-        Foundation PR
-      </p>
-      <h1 className="text-4xl leading-tight font-bold tracking-tight text-[var(--text-primary)] sm:text-5xl">
-        Mini Library Management System
-      </h1>
-      <p className="max-w-2xl text-base leading-7 text-[var(--text-secondary)]">
-        Project baseline is ready. Next PRs add mobile-first UI shell, SEO, Firebase auth, RBAC,
-        books CRUD, circulation workflows, AI features, and analytics.
-      </p>
-    </main>
+    <PublicAppShell
+      pageTitle="Elegant, Mobile-First Library UI"
+      pageDescription="PR2 introduces the design system, responsive application shell, and SEO scaffolding. Business and auth logic are layered in upcoming PRs."
+    >
+      <Card className="space-y-4">
+        <Badge variant="accent">Incremental Delivery</Badge>
+        <CardTitle>Ready for feature layering</CardTitle>
+        <CardDescription>
+          The layout system and route scaffolding are now in place for authentication, RBAC, CRUD,
+          circulation, AI, and analytics.
+        </CardDescription>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Link href="/catalog" className={buttonClassName({ className: 'sm:w-auto' })}>
+            Explore catalog scaffold
+          </Link>
+          <Link
+            href="/login"
+            className={buttonClassName({ variant: 'secondary', className: 'sm:w-auto' })}
+          >
+            Open sign-in scaffold
+          </Link>
+        </div>
+      </Card>
+    </PublicAppShell>
   );
 }
