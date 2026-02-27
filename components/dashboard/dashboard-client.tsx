@@ -4,6 +4,7 @@ import { Activity, AlertTriangle, BookOpenText, RefreshCcw, TrendingUp } from 'l
 import type { ComponentType } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { AiOverviewPanel } from '@/components/dashboard/ai-overview-panel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -229,7 +230,9 @@ export function DashboardClient() {
             <Card className="space-y-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-[var(--text-primary)]">Monthly circulation trend</p>
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">
+                    Monthly circulation trend
+                  </p>
                   <p className="text-xs text-[var(--text-secondary)]">
                     Checkouts and checkins for the selected {range}-month window.
                   </p>
@@ -250,11 +253,20 @@ export function DashboardClient() {
                 <div className="flex min-w-[22rem] items-end gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)]/45 p-3">
                   {(overview?.monthlyCheckouts ?? []).map((checkoutMonth, index) => {
                     const checkinMonth = overview?.monthlyCheckins[index];
-                    const checkoutHeight = Math.max(10, (checkoutMonth.count / maxMonthlyCount) * 110);
-                    const checkinHeight = Math.max(10, ((checkinMonth?.count ?? 0) / maxMonthlyCount) * 110);
+                    const checkoutHeight = Math.max(
+                      10,
+                      (checkoutMonth.count / maxMonthlyCount) * 110,
+                    );
+                    const checkinHeight = Math.max(
+                      10,
+                      ((checkinMonth?.count ?? 0) / maxMonthlyCount) * 110,
+                    );
 
                     return (
-                      <div key={checkoutMonth.month} className="flex flex-1 flex-col items-center gap-1">
+                      <div
+                        key={checkoutMonth.month}
+                        className="flex flex-1 flex-col items-center gap-1"
+                      >
                         <div className="flex h-28 items-end gap-1">
                           <span
                             className="w-3 rounded-t-md bg-[#2446e8] transition-all duration-700 ease-[var(--motion-smooth)]"
@@ -267,7 +279,9 @@ export function DashboardClient() {
                             title={`${checkoutMonth.month}: ${checkinMonth?.count ?? 0} checkins`}
                           />
                         </div>
-                        <p className="text-[11px] font-medium text-[var(--text-secondary)]">{checkoutMonth.month}</p>
+                        <p className="text-[11px] font-medium text-[var(--text-secondary)]">
+                          {checkoutMonth.month}
+                        </p>
                       </div>
                     );
                   })}
@@ -277,7 +291,9 @@ export function DashboardClient() {
 
             <Card className="space-y-4">
               <div>
-                <p className="text-sm font-semibold text-[var(--text-primary)]">Circulation composition</p>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                  Circulation composition
+                </p>
                 <p className="text-xs text-[var(--text-secondary)]">
                   Availability, active loans, and overdue pressure.
                 </p>
@@ -294,7 +310,9 @@ export function DashboardClient() {
                         <p className="text-[10px] font-semibold tracking-[0.09em] text-[var(--text-muted)]">
                           UTILIZATION
                         </p>
-                        <p className="text-3xl font-bold text-[var(--text-primary)]">{utilizationRate}%</p>
+                        <p className="text-3xl font-bold text-[var(--text-primary)]">
+                          {utilizationRate}%
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -333,6 +351,8 @@ export function DashboardClient() {
               </div>
             </Card>
           </div>
+
+          {overview ? <AiOverviewPanel analytics={overview} /> : null}
         </>
       )}
     </section>
@@ -362,12 +382,14 @@ function MetricCard({
   return (
     <Card className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">{label}</p>
+        <p className="text-[11px] font-semibold tracking-[0.08em] text-[var(--text-muted)] uppercase">
+          {label}
+        </p>
         <span className={cn('rounded-full p-2', iconToneClass)}>
           <Icon className="h-4 w-4" />
         </span>
       </div>
-      <p className="text-3xl font-bold leading-none text-[var(--text-primary)]">{value}</p>
+      <p className="text-3xl leading-none font-bold text-[var(--text-primary)]">{value}</p>
       <p className="text-xs text-[var(--text-secondary)]">{helper}</p>
     </Card>
   );
@@ -387,7 +409,9 @@ function CompositionRow({
   surfaceClass: string;
 }) {
   return (
-    <div className={cn('space-y-2 rounded-xl border border-[var(--border-subtle)] p-3', surfaceClass)}>
+    <div
+      className={cn('space-y-2 rounded-xl border border-[var(--border-subtle)] p-3', surfaceClass)}
+    >
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-semibold text-[var(--text-primary)]">{label}</p>
         <p className="text-sm font-semibold text-[var(--text-primary)]">
@@ -396,7 +420,10 @@ function CompositionRow({
       </div>
       <div className="h-2 rounded-full bg-[var(--surface-card)]/70">
         <div
-          className={cn('h-2 rounded-full transition-all duration-700 ease-[var(--motion-smooth)]', colorClass)}
+          className={cn(
+            'h-2 rounded-full transition-all duration-700 ease-[var(--motion-smooth)]',
+            colorClass,
+          )}
           style={{ width: `${percent}%` }}
         />
       </div>

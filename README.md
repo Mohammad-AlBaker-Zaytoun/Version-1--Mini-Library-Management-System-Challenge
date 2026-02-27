@@ -4,7 +4,7 @@
 
 Interview-focused, incremental implementation of a mobile-first library platform built with Next.js, Firebase, and practical AI features.
 
-Current status: **PR10 Firestore Seeding**.
+Current status: **PR11 Dashboard + Catalog AI Insights**.
 
 ## Goals
 
@@ -51,6 +51,8 @@ Current status: **PR10 Firestore Seeding**.
   - admin metadata enrichment endpoint (`POST /api/ai/enrich-book`)
   - AI summary + genre + tag suggestions in admin book form
   - strict output validation with fallback response mode
+  - dashboard AI operations brief (`POST /api/dashboard/ai-overview`)
+  - catalog AI next-book recommendation (`POST /api/catalog/ai-recommendation`)
 - SEO baseline:
   - metadata + OpenGraph/Twitter
   - canonical routes
@@ -131,18 +133,20 @@ erDiagram
 
 ## API Surface
 
-| Method   | Endpoint                    | Access        | Purpose                            |
-| -------- | --------------------------- | ------------- | ---------------------------------- |
-| `GET`    | `/api/books`                | Authenticated | Search/filter/paginate catalog     |
-| `POST`   | `/api/books`                | Admin         | Create book                        |
-| `GET`    | `/api/books/:id`            | Authenticated | Read one book                      |
-| `PATCH`  | `/api/books/:id`            | Admin         | Update book                        |
-| `DELETE` | `/api/books/:id`            | Admin         | Delete book                        |
-| `POST`   | `/api/circulation/checkout` | Authenticated | Borrow a book                      |
-| `POST`   | `/api/circulation/checkin`  | Authenticated | Return a book                      |
-| `GET`    | `/api/circulation/history`  | Authenticated | Circulation timeline               |
-| `POST`   | `/api/ai/enrich-book`       | Admin         | AI metadata enrichment             |
-| `GET`    | `/api/analytics/overview`   | Authenticated | Dashboard metrics (`range=3,6,12`) |
+| Method   | Endpoint                         | Access        | Purpose                                              |
+| -------- | -------------------------------- | ------------- | ---------------------------------------------------- |
+| `GET`    | `/api/books`                     | Authenticated | Search/filter/paginate catalog                       |
+| `POST`   | `/api/books`                     | Admin         | Create book                                          |
+| `GET`    | `/api/books/:id`                 | Authenticated | Read one book                                        |
+| `PATCH`  | `/api/books/:id`                 | Admin         | Update book                                          |
+| `DELETE` | `/api/books/:id`                 | Admin         | Delete book                                          |
+| `POST`   | `/api/circulation/checkout`      | Authenticated | Borrow a book                                        |
+| `POST`   | `/api/circulation/checkin`       | Authenticated | Return a book                                        |
+| `GET`    | `/api/circulation/history`       | Authenticated | Circulation timeline                                 |
+| `POST`   | `/api/ai/enrich-book`            | Admin         | AI metadata enrichment                               |
+| `GET`    | `/api/analytics/overview`        | Authenticated | Dashboard metrics (`range=3,6,12`)                   |
+| `POST`   | `/api/dashboard/ai-overview`     | Authenticated | AI summary and recommendations for dashboard metrics |
+| `POST`   | `/api/catalog/ai-recommendation` | Authenticated | AI next-book suggestion based on member history      |
 
 ## Branch / PR Strategy
 
@@ -156,6 +160,7 @@ erDiagram
 8. `feat/08-overdue-analytics`
 9. `chore/09-quality-ci-readme-final`
 10. `chore/10-firestore-seeding`
+11. `feat/11-dashboard-catalog-ai-insights`
 
 ## Environment Variables
 
