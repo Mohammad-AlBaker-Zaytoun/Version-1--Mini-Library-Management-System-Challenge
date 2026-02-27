@@ -4,7 +4,7 @@
 
 Interview-focused, incremental implementation of a mobile-first library platform built with Next.js, Firebase, and practical AI features.
 
-Current status: **PR15 SEO + README Polish**.
+Current status: **PR16 History Component Relocation**.
 
 ## Goals
 
@@ -167,6 +167,8 @@ erDiagram
 12. `feat/12-protected-layout-app-shell`
 13. `refactor/13-dashboard-componentization`
 14. `refactor/14-catalog-componentization`
+15. `chore/15-seo-readme-polish`
+16. `refactor/16-history-component-relocation`
 
 ## Environment Variables
 
