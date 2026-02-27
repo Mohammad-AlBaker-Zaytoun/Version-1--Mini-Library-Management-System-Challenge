@@ -22,7 +22,21 @@ export const metadata: Metadata = {
     template: '%s | Mini Library Management System',
   },
   description:
-    'Interview-ready, mobile-first mini library platform built incrementally with Next.js, Firebase, and AI.',
+    'Mobile-first mini library management platform with elegant UI, analytics-ready screens, and SEO baseline.',
+  keywords: ['library management', 'next.js', 'mobile-first', 'seo', 'dashboard', 'catalog'],
+  openGraph: {
+    title: 'Mini Library Management System',
+    description:
+      'Mobile-first library app scaffold with polished UI shell, responsive pages, and SEO groundwork.',
+    url: appUrl,
+    siteName: 'Mini Library Management System',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Mini Library Management System',
+    description: 'Elegant, responsive library app scaffold built with Next.js.',
+  },
   alternates: {
     canonical: '/',
   },
