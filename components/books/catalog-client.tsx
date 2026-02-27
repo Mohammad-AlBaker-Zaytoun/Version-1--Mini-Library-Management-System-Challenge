@@ -6,15 +6,21 @@ import type { ReadonlyURLSearchParams } from 'next/navigation';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { authFetch } from '@/lib/auth/client';
-import type { BookAvailability, BooksListResponse } from '@/lib/types';
-import { cn } from '@/lib/utils';
+import { useAuth } from '@/components/providers/auth-provider';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { authFetch } from '@/lib/auth/client';
+import type {
+  Book,
+  BookAvailability,
+  BooksListResponse,
+  UserProfile,
+} from '@/lib/types';
+import { cn } from '@/lib/utils';
 
 const PAGE_SIZE = 12;
 const FILTER_DEBOUNCE_MS = 350;
@@ -33,6 +39,15 @@ interface CatalogQueryState extends CatalogFilters {
   page: number;
 }
 
+type CirculationAction = 'checkout' | 'checkin' | 'none';
+
+interface BookActionState {
+  action: CirculationAction;
+  label: string;
+  disabled: boolean;
+  hint?: string;
+}
+
 const EMPTY_FILTERS: CatalogFilters = {
   q: '',
   author: '',
@@ -40,6 +55,19 @@ const EMPTY_FILTERS: CatalogFilters = {
   tags: '',
   availability: '',
 };
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+async function readApiError(response: Response, fallback: string): Promise<string> {
+  try {
+    const payload = (await response.json()) as { error?: string };
+    return payload.error ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 function parsePage(value: string | null): number {
   if (!value) {
@@ -146,7 +174,83 @@ function truncateDescription(value: string | undefined, maxLength: number): stri
   return `${value.slice(0, maxLength).trimEnd()}...`;
 }
 
+function formatDueDate(iso: string | undefined): string | null {
+  if (!iso) {
+    return null;
+  }
+
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(parsed);
+}
+
+function isOverdue(iso: string | undefined): boolean {
+  if (!iso) {
+    return false;
+  }
+
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) {
+    return false;
+  }
+
+  return parsed.getTime() < Date.now();
+}
+
+function getBookAction(book: Book, profile: UserProfile | null): BookActionState {
+  if (!profile) {
+    return {
+      action: 'none',
+      label: 'Unavailable',
+      disabled: true,
+      hint: 'You need to be signed in to manage circulation',
+    };
+  }
+
+  if (book.availability === 'available') {
+    return {
+      action: 'checkout',
+      label: 'Check out',
+      disabled: false,
+      hint: 'Starts a new loan and records a checkout transaction',
+    };
+  }
+
+  if (profile.role === 'admin') {
+    return {
+      action: 'checkin',
+      label: 'Check in',
+      disabled: false,
+      hint: 'Admin can process returns for active loans',
+    };
+  }
+
+  if (book.borrowedByUid === profile.uid) {
+    return {
+      action: 'checkin',
+      label: 'Return',
+      disabled: false,
+      hint: 'Complete your active loan',
+    };
+  }
+
+  return {
+    action: 'none',
+    label: 'Borrowed',
+    disabled: true,
+    hint: `Currently borrowed by ${book.borrowedByName ?? 'another member'}`,
+  };
+}
+
 export function CatalogClient() {
+  const { profile } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -154,6 +258,8 @@ export function CatalogClient() {
   const [results, setResults] = useState<BooksListResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [busyBookId, setBusyBookId] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
 
@@ -291,6 +397,44 @@ export function CatalogClient() {
     router.replace(pathname as Route, { scroll: false });
   }
 
+  async function handleCirculation(book: Book, action: 'checkout' | 'checkin') {
+    if (busyBookId) {
+      return;
+    }
+
+    setMutationError(null);
+    setBusyBookId(book.id);
+    try {
+      const endpoint =
+        action === 'checkout' ? '/api/circulation/checkout' : '/api/circulation/checkin';
+      const payload =
+        action === 'checkout'
+          ? {
+              bookId: book.id,
+              dueDays: 14,
+            }
+          : {
+              bookId: book.id,
+            };
+
+      const response = await authFetch(endpoint, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(await readApiError(response, `Unable to ${action} book`));
+      }
+
+      await response.json();
+      setRefreshTick((current) => current + 1);
+    } catch (cause) {
+      setMutationError(getErrorMessage(cause, `Unable to ${action} book`));
+    } finally {
+      setBusyBookId(null);
+    }
+  }
+
   const page = results?.page ?? urlState.page;
   const totalPages = results?.totalPages ?? 1;
   const total = results?.total ?? 0;
@@ -311,7 +455,11 @@ export function CatalogClient() {
             </p>
           </div>
           <Badge variant="muted">
-            {isRefreshing ? 'Refreshing' : `${total} result${total === 1 ? '' : 's'}`}
+            {busyBookId
+              ? 'Updating loan'
+              : isRefreshing
+                ? 'Refreshing'
+                : `${total} result${total === 1 ? '' : 's'}`}
           </Badge>
         </div>
 
@@ -378,7 +526,7 @@ export function CatalogClient() {
               type="button"
               variant="outline"
               onClick={resetFilters}
-              disabled={!hasFilters}
+              disabled={!hasFilters || Boolean(busyBookId)}
               className="sm:min-w-28"
             >
               <X className="mr-1 h-4 w-4" />
@@ -404,6 +552,13 @@ export function CatalogClient() {
         </Card>
       ) : null}
 
+      {mutationError ? (
+        <Card className="space-y-2 border-amber-200 bg-amber-50/80">
+          <p className="text-sm font-semibold text-amber-700">Circulation action failed</p>
+          <p className="text-xs text-amber-700/90">{mutationError}</p>
+        </Card>
+      ) : null}
+
       {isLoading ? (
         <CatalogGridSkeleton />
       ) : books.length === 0 ? (
@@ -423,51 +578,97 @@ export function CatalogClient() {
       ) : (
         <>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {books.map((book) => (
-              <Card
-                key={book.id}
-                className={cn(
-                  'flex h-full transform-gpu flex-col gap-3 transition-[transform,box-shadow,border-color] duration-300 ease-[var(--motion-smooth)] hover:-translate-y-0.5 hover:border-[#c8d4ff]',
-                )}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="text-lg font-semibold leading-snug text-[var(--text-primary)]">
-                    {book.title}
-                  </h3>
-                  <Badge variant={book.availability === 'available' ? 'accent' : 'default'}>
-                    {book.availability === 'available' ? 'Available' : 'Checked out'}
-                  </Badge>
-                </div>
+            {books.map((book) => {
+              const actionState = getBookAction(book, profile);
+              const dueDate = formatDueDate(book.dueDate);
+              const overdue = isOverdue(book.dueDate);
+              const isBookBusy = busyBookId === book.id;
 
-                <p className="text-sm text-[var(--text-secondary)]">by {book.author}</p>
+              return (
+                <Card
+                  key={book.id}
+                  className={cn(
+                    'flex h-full transform-gpu flex-col gap-3 transition-[transform,box-shadow,border-color] duration-300 ease-[var(--motion-smooth)] hover:-translate-y-0.5 hover:border-[#c8d4ff]',
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="text-lg font-semibold leading-snug text-[var(--text-primary)]">
+                      {book.title}
+                    </h3>
+                    <Badge variant={book.availability === 'available' ? 'accent' : 'default'}>
+                      {book.availability === 'available' ? 'Available' : 'Checked out'}
+                    </Badge>
+                  </div>
 
-                <div className="flex flex-wrap gap-1">
-                  {book.genre ? <Badge variant="muted">{book.genre}</Badge> : null}
-                  {typeof book.publishedYear === 'number' ? (
-                    <Badge variant="muted">{book.publishedYear}</Badge>
-                  ) : null}
-                </div>
+                  <p className="text-sm text-[var(--text-secondary)]">by {book.author}</p>
 
-                <p className="text-xs leading-5 text-[var(--text-muted)]">
-                  {truncateDescription(book.description ?? book.aiSummary, 140)}
-                </p>
-
-                {book.tags.length > 0 ? (
-                  <div className="mt-auto flex flex-wrap gap-1">
-                    {book.tags.slice(0, 4).map((tag) => (
-                      <Badge key={`${book.id}-${tag}`} variant="muted" className="text-[11px]">
-                        #{tag}
-                      </Badge>
-                    ))}
-                    {book.tags.length > 4 ? (
-                      <Badge variant="muted" className="text-[11px]">
-                        +{book.tags.length - 4}
-                      </Badge>
+                  <div className="flex flex-wrap gap-1">
+                    {book.genre ? <Badge variant="muted">{book.genre}</Badge> : null}
+                    {typeof book.publishedYear === 'number' ? (
+                      <Badge variant="muted">{book.publishedYear}</Badge>
                     ) : null}
                   </div>
-                ) : null}
-              </Card>
-            ))}
+
+                  {book.availability === 'checked_out' ? (
+                    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)]/50 p-2">
+                      <p className="text-xs text-[var(--text-secondary)]">
+                        Borrower: <span className="font-semibold">{book.borrowedByName ?? 'Unknown'}</span>
+                      </p>
+                      <p
+                        className={cn(
+                          'text-xs',
+                          overdue ? 'font-semibold text-[#c43f32]' : 'text-[var(--text-secondary)]',
+                        )}
+                      >
+                        {dueDate ? `Due ${dueDate}${overdue ? ' (Overdue)' : ''}` : 'Due date unavailable'}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-[var(--text-secondary)]">
+                      Ready to borrow with a default 14-day due window.
+                    </p>
+                  )}
+
+                  <p className="text-xs leading-5 text-[var(--text-muted)]">
+                    {truncateDescription(book.description ?? book.aiSummary, 140)}
+                  </p>
+
+                  {book.tags.length > 0 ? (
+                    <div className="mt-auto flex flex-wrap gap-1">
+                      {book.tags.slice(0, 4).map((tag) => (
+                        <Badge key={`${book.id}-${tag}`} variant="muted" className="text-[11px]">
+                          #{tag}
+                        </Badge>
+                      ))}
+                      {book.tags.length > 4 ? (
+                        <Badge variant="muted" className="text-[11px]">
+                          +{book.tags.length - 4}
+                        </Badge>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  <div className="space-y-1">
+                    <Button
+                      variant={actionState.action === 'checkin' ? 'secondary' : 'primary'}
+                      disabled={actionState.disabled || Boolean(busyBookId)}
+                      loading={isBookBusy}
+                      loadingText={actionState.action === 'checkin' ? 'Checking in...' : 'Checking out...'}
+                      onClick={() => {
+                        if (actionState.action !== 'none') {
+                          void handleCirculation(book, actionState.action);
+                        }
+                      }}
+                    >
+                      {actionState.label}
+                    </Button>
+                    {actionState.hint ? (
+                      <p className="text-[11px] text-[var(--text-muted)]">{actionState.hint}</p>
+                    ) : null}
+                  </div>
+                </Card>
+              );
+            })}
           </div>
 
           <Card className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -478,7 +679,7 @@ export function CatalogClient() {
               <Button
                 variant="outline"
                 size="sm"
-                disabled={page <= 1}
+                disabled={page <= 1 || Boolean(busyBookId)}
                 onClick={() => goToPage(page - 1)}
               >
                 Previous
@@ -486,7 +687,7 @@ export function CatalogClient() {
               <Button
                 variant="outline"
                 size="sm"
-                disabled={page >= totalPages}
+                disabled={page >= totalPages || Boolean(busyBookId)}
                 onClick={() => goToPage(page + 1)}
               >
                 Next

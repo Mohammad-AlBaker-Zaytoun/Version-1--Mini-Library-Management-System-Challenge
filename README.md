@@ -2,7 +2,7 @@
 
 Incremental, interview-focused project scaffold for building a mobile-first library platform with Next.js + Firebase + AI.
 
-Current status: **PR5 Search + Filters** (mobile-first catalog discovery UI with debounced URL-bound filters, pagination, and tag-aware server search).
+Current status: **PR6 Circulation Workflows** (checkout/checkin APIs with immutable transaction history, role-aware permissions, and catalog/history UI integration).
 
 ## Goals
 
@@ -18,7 +18,7 @@ Current status: **PR5 Search + Filters** (mobile-first catalog discovery UI with
 - Gemini API features
 - Vercel deployment
 
-## Current Scope (PR5)
+## Current Scope (PR6)
 
 - Next.js project initialized
 - Tailwind CSS + global theme tokens
@@ -64,6 +64,18 @@ Current status: **PR5 Search + Filters** (mobile-first catalog discovery UI with
     - `availability`
     - `page`
     - `limit`
+- Circulation and history (PR6):
+  - circulation APIs:
+    - `POST /api/circulation/checkout`
+    - `POST /api/circulation/checkin`
+    - `GET /api/circulation/history`
+  - transaction-safe checkout/checkin state transitions in Firestore
+  - immutable `circulationTransactions` ledger entries for each circulation action
+  - role-aware behavior:
+    - `member`: can checkout/checkin for self only
+    - `admin`: can process circulation across members (API supports `memberUid`)
+  - `/catalog` now includes checkout/checkin actions with loading locks
+  - `/history` now renders live timeline, action filters, and pagination
 - SEO baseline:
   - root and per-page metadata
   - OpenGraph/Twitter cards
@@ -81,6 +93,44 @@ flowchart LR
   API --> DB[(Firestore)]
   API --> AI[Gemini API]
   CLIENT[Firebase Client Auth] --> UI
+```
+
+## Data Model
+
+```mermaid
+erDiagram
+  users ||--o{ circulationTransactions : "memberUid"
+  users ||--o{ books : "createdByUid/updatedByUid"
+  books ||--o{ circulationTransactions : "bookId"
+
+  users {
+    string uid PK
+    string email
+    string displayName
+    string role
+    string createdAt
+    string updatedAt
+  }
+
+  books {
+    string id PK
+    string title
+    string author
+    string availability
+    string borrowedByUid
+    string borrowedAt
+    string dueDate
+    string updatedAt
+  }
+
+  circulationTransactions {
+    string id PK
+    string bookId FK
+    string memberUid FK
+    string action
+    string dueDate
+    string createdAt
+  }
 ```
 
 ## Branch and PR Strategy
