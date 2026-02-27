@@ -1,6 +1,7 @@
 'use client';
 
 import { LoaderCircle } from 'lucide-react';
+import type { Route } from 'next';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   createContext,
@@ -16,7 +17,7 @@ import { onAuthStateChanged, signInWithPopup, signOut, type User } from 'firebas
 import { auth, googleProvider } from '@/lib/firebase/client';
 import type { UserProfile } from '@/lib/types';
 
-type AppRoute = '/catalog' | '/dashboard' | '/history' | '/admin' | '/login';
+type AppRoute = '/catalog' | '/dashboard' | '/history' | '/admin' | '/admin/books' | '/login';
 
 interface AuthContextValue {
   user: User | null;
@@ -67,6 +68,7 @@ function normalizeRedirectPath(input: string | null): AppRoute {
     '/dashboard',
     '/history',
     '/admin',
+    '/admin/books',
     '/login',
   ];
   if (!input) {
@@ -129,7 +131,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
           ? null
           : new URLSearchParams(window.location.search).get('redirect');
       const destination = normalizeRedirectPath(redirectParam);
-      router.replace(destination === '/login' ? '/catalog' : destination);
+      router.replace((destination === '/login' ? '/catalog' : destination) as Route);
     } finally {
       setLoading(false);
     }

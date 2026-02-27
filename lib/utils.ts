@@ -8,3 +8,12 @@ export function cn(...inputs: ClassValue[]) {
 export function nowIso(): string {
   return new Date().toISOString();
 }
+
+export function toTitleCase(value: string): string {
+  return value
+    .toLowerCase()
+    .split(' ')
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(' ');
+}

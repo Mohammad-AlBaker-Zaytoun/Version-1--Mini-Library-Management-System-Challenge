@@ -2,7 +2,7 @@
 
 Incremental, interview-focused project scaffold for building a mobile-first library platform with Next.js + Firebase + AI.
 
-Current status: **PR3 Firebase auth + RBAC scaffold** (Google SSO, secure session cookie flow, protected routes, role-aware admin access).
+Current status: **PR4 Book CRUD core** (admin books management UI + validated `/api/books` endpoints + Firestore persistence with audit fields).
 
 ## Goals
 
@@ -18,7 +18,7 @@ Current status: **PR3 Firebase auth + RBAC scaffold** (Google SSO, secure sessio
 - Gemini API features
 - Vercel deployment
 
-## Current Scope (PR3)
+## Current Scope (PR4)
 
 - Next.js project initialized
 - Tailwind CSS + global theme tokens
@@ -40,6 +40,17 @@ Current status: **PR3 Firebase auth + RBAC scaffold** (Google SSO, secure sessio
   - server-side protected page checks
   - role-aware admin route (`/admin`)
   - admin role bootstrap script (`pnpm bootstrap-admin --email=you@example.com`)
+- Book management core:
+  - admin books workspace (`/admin/books`)
+  - add/edit/delete book flows
+  - API handlers:
+    - `GET /api/books`
+    - `POST /api/books`
+    - `GET /api/books/:id`
+    - `PATCH /api/books/:id`
+    - `DELETE /api/books/:id`
+  - Zod validation for reads/writes
+  - Firestore book service with audit fields (`createdByUid`, `updatedByUid`, timestamps)
 - SEO baseline:
   - root and per-page metadata
   - OpenGraph/Twitter cards
@@ -109,7 +120,7 @@ Open `http://localhost:3000`.
   - `/catalog`
   - `/dashboard`
   - `/history`
-  - `/admin` (admin-only)
+  - `/admin` and `/admin/books` (admin-only)
 - Unauthenticated requests are redirected to `/login`.
 - Authenticated users visiting `/login` are redirected to `/catalog`.
 - Role model:

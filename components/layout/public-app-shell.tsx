@@ -2,6 +2,7 @@
 
 import { BookOpenText, ChartNoAxesCombined, History, LogIn, LogOut, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
+import type { Route } from 'next';
 import { usePathname } from 'next/navigation';
 import type React from 'react';
 import { useState } from 'react';
@@ -10,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/providers/auth-provider';
 import { cn } from '@/lib/utils';
 
-type NavRoute = '/catalog' | '/history' | '/dashboard' | '/admin';
+type NavRoute = '/catalog' | '/history' | '/dashboard' | '/admin/books';
 
 const memberNavItems: Array<{
   href: NavRoute;
@@ -22,7 +23,7 @@ const memberNavItems: Array<{
   { href: '/dashboard', label: 'Dashboard', icon: ChartNoAxesCombined },
 ];
 
-const adminNavItem = { href: '/admin', label: 'Admin', icon: ShieldCheck } as const;
+const adminNavItem = { href: '/admin/books', label: 'Manage Books', icon: ShieldCheck } as const;
 
 interface PublicAppShellProps {
   pageTitle: string;
@@ -91,12 +92,13 @@ export function PublicAppShell({ pageTitle, pageDescription, children }: PublicA
           <nav className="mt-3 flex gap-2 overflow-x-auto pb-1">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href;
+              const isActive =
+                pathname === item.href || (item.href === '/admin/books' && pathname.startsWith('/admin'));
 
               return (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={item.href as Route}
                   className={cn(
                     'inline-flex min-h-9 items-center gap-2 rounded-full px-3 text-sm font-medium transition-[transform,box-shadow,background-color,color] duration-300 ease-[var(--motion-smooth)] hover:-translate-y-0.5',
                     isActive
