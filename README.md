@@ -4,7 +4,7 @@
 
 Interview-focused, incremental implementation of a mobile-first library platform built with Next.js, Firebase, and practical AI features.
 
-Current status: **PR24 Unit Test Alignment**.
+Current status: **PR25 Playwright Alignment**.
 
 ## Goals
 
@@ -177,6 +177,7 @@ erDiagram
 22. `chore/22-auth-provider-token-normalization`
 23. `chore/23-catalog-ai-card-copy-polish`
 24. `test/24-unit-test-alignment`
+25. `test/25-playwright-alignment`
 
 ## Environment Variables
 
