@@ -104,3 +104,10 @@ export interface CatalogAiRecommendation {
     favoriteTags: string[];
   };
 }
+
+export interface BookAiEnrichmentResponse {
+  aiSummary: string;
+  aiSuggestedGenre: string;
+  tags: string[];
+  source: 'ai' | 'fallback';
+}
