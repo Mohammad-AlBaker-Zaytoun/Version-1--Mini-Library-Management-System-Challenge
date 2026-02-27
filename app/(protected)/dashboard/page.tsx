@@ -4,7 +4,7 @@ import { AnalyticsClient } from '@/components/dashboard/analytics-client';
 
 export const metadata: Metadata = {
   title: 'Dashboard',
-  description: 'Role-aware circulation analytics with overdue tracking and monthly trend insights.',
+  description: 'Monitor active loans, overdue books, and monthly checkout trends.',
   alternates: {
     canonical: '/dashboard',
   },

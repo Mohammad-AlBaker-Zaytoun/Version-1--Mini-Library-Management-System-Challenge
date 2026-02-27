@@ -171,8 +171,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   if (loading && pathname !== '/login') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--surface-bg)]">
-        <LoaderCircle className="h-6 w-6 animate-spin text-[var(--brand-primary)]" />
+      <div className="flex min-h-screen items-center justify-center bg-(--surface-bg)">
+        <LoaderCircle className="h-6 w-6 animate-spin text-(--brand-primary)" />
       </div>
     );
   }

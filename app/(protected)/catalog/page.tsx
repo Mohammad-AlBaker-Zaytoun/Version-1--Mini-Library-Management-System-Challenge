@@ -4,7 +4,7 @@ import { CatalogClient } from '@/components/books/catalog-client';
 
 export const metadata: Metadata = {
   title: 'Catalog',
-  description: 'Browse, search, checkout, and return books with mobile-first interactions.',
+  description: 'Search the catalog and manage check-in/check-out circulation operations.',
   alternates: {
     canonical: '/catalog',
   },
