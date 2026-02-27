@@ -8,6 +8,11 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e:install": "playwright install --with-deps chromium",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
     "bootstrap-admin": "tsx scripts/bootstrap-admin.ts",
     "format": "prettier --check .",
     "format:write": "prettier --write ."
@@ -24,6 +29,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -35,6 +41,7 @@
     "prettier-plugin-tailwindcss": "^0.7.2",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.0.18"
   }
 }
