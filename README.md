@@ -1,8 +1,12 @@
 # Mini Library Management System (Version 1)
 
+[![CI](https://github.com/Mohammad-AlBaker-Zaytoun/Version-1--Mini-Library-Management-System-Challenge/actions/workflows/ci.yml/badge.svg)](https://github.com/Mohammad-AlBaker-Zaytoun/Version-1--Mini-Library-Management-System-Challenge/actions/workflows/ci.yml)
+
 Interview-ready, mobile-first library platform built with Next.js App Router, Firebase Auth/Firestore, and Gemini AI.
 
 Live URL: `TODO_ADD_VERCEL_URL`
+
+Replace `TODO_ADD_VERCEL_URL` before sharing the repository externally.
 
 ## Table of Contents
 
@@ -15,6 +19,7 @@ Live URL: `TODO_ADD_VERCEL_URL`
 - [Prerequisites](#prerequisites)
 - [Firebase Setup](#firebase-setup)
 - [Environment Variables](#environment-variables)
+- [Quick Start for Reviewers](#quick-start-for-reviewers)
 - [Local Development](#local-development)
 - [Admin Role Bootstrap](#admin-role-bootstrap)
 - [Database Seeding (Deterministic)](#database-seeding-deterministic)
@@ -22,6 +27,7 @@ Live URL: `TODO_ADD_VERCEL_URL`
 - [Quality, Testing, and CI](#quality-testing-and-ci)
 - [SEO](#seo)
 - [Deployment (Vercel)](#deployment-vercel)
+- [Submission Checklist](#submission-checklist)
 - [Branch and PR Strategy](#branch-and-pr-strategy)
 - [Interview Demo Script](#interview-demo-script)
 - [Known Limitations (v1)](#known-limitations-v1)
@@ -232,6 +238,27 @@ cp .env.example .env.local
 | `FIREBASE_PRIVATE_KEY` | Yes | Firebase Admin private key (escaped with `\n`) |
 | `GEMINI_API_KEY` | Yes | Gemini API key |
 
+## Quick Start for Reviewers
+
+```bash
+pnpm install
+pnpm dev
+```
+
+If you want deterministic demo data before reviewing:
+
+```bash
+pnpm seed:demo --admin-email=your-google-email@example.com
+```
+
+Recommended review path:
+
+1. Sign in with Google.
+2. Open `Catalog` and test search + checkout/checkin.
+3. Open `Dashboard` and inspect analytics + AI overview.
+4. Open `History` and verify immutable transaction records.
+5. If signed in as admin, open `Manage Books` and test CRUD + AI enrichment.
+
 ## Local Development
 
 ```bash
@@ -392,6 +419,25 @@ Implemented baseline SEO:
    - `/robots.txt`
    - `/sitemap.xml`
    - Google SSO login in production
+
+## Submission Checklist
+
+Before sending this project to the company:
+
+1. Replace `TODO_ADD_VERCEL_URL` with the deployed Vercel URL.
+2. Verify Firebase Auth authorized domains include the production domain.
+3. Seed the production/demo Firestore project with:
+   - `pnpm seed:demo --admin-email=your-google-email@example.com`
+4. Smoke test:
+   - Google sign-in
+   - admin CRUD
+   - AI enrichment
+   - search/filter
+   - checkout/checkin
+   - history page
+   - dashboard analytics + AI overview
+   - `/robots.txt` and `/sitemap.xml`
+5. Add screenshots or a short GIF walkthrough if you want a stronger recruiter/reviewer experience.
 
 ## Branch and PR Strategy
 
