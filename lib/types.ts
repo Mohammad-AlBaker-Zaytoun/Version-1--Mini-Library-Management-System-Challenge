@@ -80,10 +80,16 @@ export interface BooksListResponse {
 }
 
 export interface AnalyticsOverview {
+  scope: 'admin' | 'member';
   activeLoans: number;
   overdueCount: number;
   totalBooks: number;
+  availableBooks: number;
+  myActiveLoans: number;
+  myOverdueLoans: number;
+  utilizationRate: number;
   monthlyCheckouts: Array<{ month: string; count: number }>;
+  monthlyCheckins: Array<{ month: string; count: number }>;
 }
 
 export interface DashboardAiInsight {
