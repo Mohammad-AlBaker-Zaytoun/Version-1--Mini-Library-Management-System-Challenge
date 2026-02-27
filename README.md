@@ -2,7 +2,7 @@
 
 Incremental, interview-focused project scaffold for building a mobile-first library platform with Next.js + Firebase + AI.
 
-Current status: **PR2 UI + SEO scaffold** (mobile-first app shell, responsive placeholder pages, robots/sitemap, enriched metadata).
+Current status: **PR3 Firebase auth + RBAC scaffold** (Google SSO, secure session cookie flow, protected routes, role-aware admin access).
 
 ## Goals
 
@@ -18,7 +18,7 @@ Current status: **PR2 UI + SEO scaffold** (mobile-first app shell, responsive pl
 - Gemini API features
 - Vercel deployment
 
-## Current Scope (PR2)
+## Current Scope (PR3)
 
 - Next.js project initialized
 - Tailwind CSS + global theme tokens
@@ -31,6 +31,15 @@ Current status: **PR2 UI + SEO scaffold** (mobile-first app shell, responsive pl
   - `/catalog`
   - `/dashboard`
   - `/history`
+- Authentication and authorization scaffold:
+  - Firebase client/admin wiring
+  - Google SSO sign-in and sign-out
+  - Session cookie API (`/api/auth/session`)
+  - User profile sync API (`/api/auth/sync`)
+  - route protection middleware (`proxy.ts`)
+  - server-side protected page checks
+  - role-aware admin route (`/admin`)
+  - admin role bootstrap script (`pnpm bootstrap-admin --email=you@example.com`)
 - SEO baseline:
   - root and per-page metadata
   - OpenGraph/Twitter cards
@@ -93,6 +102,29 @@ pnpm dev
 ```
 
 Open `http://localhost:3000`.
+
+## Auth + RBAC Notes
+
+- Protected pages:
+  - `/catalog`
+  - `/dashboard`
+  - `/history`
+  - `/admin` (admin-only)
+- Unauthenticated requests are redirected to `/login`.
+- Authenticated users visiting `/login` are redirected to `/catalog`.
+- Role model:
+  - `member`
+  - `admin`
+
+## Promote a User to Admin
+
+After signing in once with Google:
+
+```bash
+pnpm bootstrap-admin --email=you@example.com
+# or
+pnpm bootstrap-admin --uid=YOUR_FIREBASE_UID
+```
 
 ## Quality Commands
 

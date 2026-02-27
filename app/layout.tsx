@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Fraunces, Manrope } from 'next/font/google';
 
 import '@/app/globals.css';
+import { AuthProvider } from '@/components/providers/auth-provider';
 
 const sans = Manrope({
   subsets: ['latin'],
@@ -49,7 +50,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${sans.variable} ${display.variable}`}>{children}</body>
+      <body className={`${sans.variable} ${display.variable}`}>
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }

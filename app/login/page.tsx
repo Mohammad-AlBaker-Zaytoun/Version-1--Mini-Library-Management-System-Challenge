@@ -1,13 +1,10 @@
 import type { Metadata } from 'next';
-import { LockKeyhole, ShieldCheck } from 'lucide-react';
 
-import { PublicAppShell } from '@/components/layout/public-app-shell';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardDescription, CardTitle } from '@/components/ui/card';
+import { LoginCard } from '@/components/auth/login-card';
 
 export const metadata: Metadata = {
   title: 'Sign In',
-  description: 'Sign in with Google SSO to access library workflows.',
+  description: 'Sign in with Google SSO to access the mini library management system.',
   alternates: {
     canonical: '/login',
   },
@@ -15,38 +12,14 @@ export const metadata: Metadata = {
 
 export default function LoginPage() {
   return (
-    <PublicAppShell
-      pageTitle="Sign-In Experience Scaffold"
-      pageDescription="This route is styled and responsive. Firebase Google SSO wiring and session syncing are added in PR3."
-    >
-      <Card className="space-y-4">
-        <Badge variant="muted">Coming next</Badge>
-        <CardTitle>Google SSO Integration</CardTitle>
-        <CardDescription>
-          Authentication controls are intentionally deferred to the next branch to keep this PR
-          scoped to layout and SEO foundations.
-        </CardDescription>
-        <div className="grid gap-2 sm:grid-cols-2">
-          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)]/55 p-3">
-            <p className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
-              <LockKeyhole className="h-4 w-4 text-[var(--brand-primary)]" />
-              Session Cookies
-            </p>
-            <p className="mt-1 text-xs text-[var(--text-secondary)]">
-              Secure server session flow will protect private routes.
-            </p>
-          </div>
-          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)]/55 p-3">
-            <p className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
-              <ShieldCheck className="h-4 w-4 text-[#117151]" />
-              Role-Aware Access
-            </p>
-            <p className="mt-1 text-xs text-[var(--text-secondary)]">
-              `admin` and `member` guards are introduced with Firebase profile sync.
-            </p>
-          </div>
-        </div>
-      </Card>
-    </PublicAppShell>
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,#fed7aa88,transparent_30%),radial-gradient(circle_at_80%_80%,#c7d2fe80,transparent_35%)]" />
+      <div className="relative w-full max-w-md">
+        <h1 className="mb-4 text-center font-[family-name:var(--font-display)] text-3xl text-[var(--text-primary)]">
+          Welcome Back
+        </h1>
+        <LoginCard />
+      </div>
+    </main>
   );
 }

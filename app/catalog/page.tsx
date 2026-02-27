@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
 import { Search } from 'lucide-react';
+import { redirect } from 'next/navigation';
 
 import { PublicAppShell } from '@/components/layout/public-app-shell';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getSessionUser } from '@/lib/auth/api-auth';
 
 export const metadata: Metadata = {
   title: 'Catalog',
@@ -14,7 +16,12 @@ export const metadata: Metadata = {
   },
 };
 
-export default function CatalogPage() {
+export default async function CatalogPage() {
+  const user = await getSessionUser();
+  if (!user) {
+    redirect('/login');
+  }
+
   return (
     <PublicAppShell
       pageTitle="Catalog UI Scaffold"
