@@ -5,7 +5,7 @@ import { parseJsonBody } from '@/lib/api/request';
 import { requireApiUser } from '@/lib/auth/api-auth';
 import { requireRole } from '@/lib/auth/permissions';
 import { enrichBookRequestSchema } from '@/lib/schemas/ai';
-import { enrichBookMetadata } from '@/lib/services/ai-book-enrichment';
+import { enrichBookMetadata } from '@/lib/services/ai';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {

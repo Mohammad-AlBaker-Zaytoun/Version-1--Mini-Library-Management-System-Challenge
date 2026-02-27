@@ -1,16 +1,38 @@
 import { getServerEnv } from '@/lib/env';
 import {
   catalogAiSuggestionOutputSchema,
+  geminiEnrichmentSchema,
   dashboardAiInsightOutputSchema,
   type CatalogAiSuggestionInput,
   type CatalogAiSuggestionOutput,
   type DashboardAiInsightInput,
   type DashboardAiInsightOutput,
+  type EnrichBookRequestInput,
 } from '@/lib/schemas/ai';
+import { normalizeTags } from '@/lib/services/book-utils';
+import type { BookAiEnrichmentResponse } from '@/lib/types';
+import { toTitleCase } from '@/lib/utils';
 
 const GEMINI_MODEL = 'gemini-1.5-flash';
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const REQUEST_TIMEOUT_MS = 12000;
+
+const COMMON_STOPWORDS = new Set([
+  'and',
+  'the',
+  'for',
+  'with',
+  'from',
+  'into',
+  'about',
+  'this',
+  'that',
+  'book',
+  'story',
+  'novel',
+  'guide',
+  'edition',
+]);
 
 interface GeminiGenerateContentResponse {
   candidates?: Array<{
@@ -20,6 +42,14 @@ interface GeminiGenerateContentResponse {
       }>;
     };
   }>;
+}
+
+function truncate(value: string, maxLength: number): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  return `${value.slice(0, maxLength - 3).trimEnd()}...`;
 }
 
 function extractResponseText(response: GeminiGenerateContentResponse): string {
@@ -44,7 +74,11 @@ function extractJsonPayload(rawText: string): unknown {
   return JSON.parse(cleanPayload);
 }
 
-async function runGeminiPrompt(prompt: string, maxOutputTokens: number): Promise<unknown> {
+async function runGeminiPrompt(
+  prompt: string,
+  maxOutputTokens: number,
+  topP: number,
+): Promise<unknown> {
   const env = getServerEnv();
   const controller = new AbortController();
   const timeout = setTimeout(() => {
@@ -68,7 +102,7 @@ async function runGeminiPrompt(prompt: string, maxOutputTokens: number): Promise
           ],
           generationConfig: {
             temperature: 0.2,
-            topP: 0.85,
+            topP,
             maxOutputTokens,
             responseMimeType: 'application/json',
           },
@@ -86,6 +120,92 @@ async function runGeminiPrompt(prompt: string, maxOutputTokens: number): Promise
     return extractJsonPayload(text);
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+function toKeywordTags(input: EnrichBookRequestInput): string[] {
+  const titleTags = input.title
+    .split(/[^a-zA-Z0-9]+/)
+    .map((segment) => segment.trim().toLowerCase())
+    .filter((segment) => segment.length >= 4 && !COMMON_STOPWORDS.has(segment))
+    .slice(0, 3)
+    .map((segment) => toTitleCase(segment));
+
+  const fallbackTags = [
+    ...(input.genre ? [toTitleCase(input.genre)] : []),
+    ...input.tags.map((tag) => toTitleCase(tag)),
+    ...titleTags,
+  ];
+
+  return normalizeTags(fallbackTags).slice(0, 8);
+}
+
+function buildFallbackEnrichment(input: EnrichBookRequestInput): BookAiEnrichmentResponse {
+  const tags = toKeywordTags(input);
+  const suggestedGenre = input.genre?.trim() ? toTitleCase(input.genre) : (tags[0] ?? 'General');
+
+  const shortDescription = input.description
+    ?.trim()
+    .split(/(?<=[.!?])\s+/)[0]
+    ?.trim();
+
+  const yearText = typeof input.publishedYear === 'number' ? ` (${input.publishedYear})` : '';
+  const baseSummary = shortDescription
+    ? shortDescription
+    : `${input.title}${yearText} by ${input.author} is a ${suggestedGenre.toLowerCase()} catalog title suitable for readers interested in ${tags.slice(0, 3).join(', ') || 'new discoveries'}.`;
+
+  return {
+    aiSummary: truncate(baseSummary, 600),
+    aiSuggestedGenre: truncate(suggestedGenre, 80),
+    tags: tags.length > 0 ? tags : ['General'],
+    source: 'fallback',
+  };
+}
+
+function buildEnrichmentPrompt(input: EnrichBookRequestInput): string {
+  const seedTags = input.tags.length > 0 ? input.tags.join(', ') : 'none';
+
+  return [
+    'You are assisting a library administrator with metadata enrichment.',
+    'Return only JSON with this exact shape:',
+    '{"summary":"string","suggestedGenre":"string","tags":["string"]}',
+    'Rules:',
+    '- summary: objective, concise, max 280 characters.',
+    '- suggestedGenre: single genre phrase, max 40 characters.',
+    '- tags: 4-8 distinct tags, each max 24 characters.',
+    '- Avoid markdown, commentary, or code fences.',
+    '',
+    'Book input:',
+    `title: ${input.title}`,
+    `author: ${input.author}`,
+    `isbn: ${input.isbn?.trim() || 'n/a'}`,
+    `genre: ${input.genre?.trim() || 'n/a'}`,
+    `publishedYear: ${typeof input.publishedYear === 'number' ? input.publishedYear : 'n/a'}`,
+    `description: ${input.description?.trim() || 'n/a'}`,
+    `existingTags: ${seedTags}`,
+  ].join('\n');
+}
+
+async function runGeminiEnrichment(input: EnrichBookRequestInput) {
+  const raw = await runGeminiPrompt(buildEnrichmentPrompt(input), 320, 0.9);
+  return geminiEnrichmentSchema.parse(raw);
+}
+
+export async function enrichBookMetadata(
+  input: EnrichBookRequestInput,
+): Promise<BookAiEnrichmentResponse> {
+  const fallback = buildFallbackEnrichment(input);
+
+  try {
+    const aiOutput = await runGeminiEnrichment(input);
+    return {
+      aiSummary: truncate(aiOutput.summary.trim(), 600),
+      aiSuggestedGenre: truncate(aiOutput.suggestedGenre.trim(), 80),
+      tags: normalizeTags(aiOutput.tags).slice(0, 12),
+      source: 'ai',
+    };
+  } catch {
+    return fallback;
   }
 }
 
@@ -126,12 +246,8 @@ function fallbackDashboardInsight(input: DashboardAiInsightInput): DashboardAiIn
 }
 
 function buildDashboardPrompt(input: DashboardAiInsightInput): string {
-  const checkoutSeries = input.monthlyCheckouts
-    .map((item) => `${item.month}:${item.count}`)
-    .join(', ');
-  const checkinSeries = input.monthlyCheckins
-    .map((item) => `${item.month}:${item.count}`)
-    .join(', ');
+  const checkoutSeries = input.monthlyCheckouts.map((item) => `${item.month}:${item.count}`).join(', ');
+  const checkinSeries = input.monthlyCheckins.map((item) => `${item.month}:${item.count}`).join(', ');
 
   return [
     'You are an operations analyst for a library management platform.',
@@ -162,7 +278,7 @@ export async function generateDashboardInsight(
   const fallback = fallbackDashboardInsight(input);
 
   try {
-    const raw = await runGeminiPrompt(buildDashboardPrompt(input), 520);
+    const raw = await runGeminiPrompt(buildDashboardPrompt(input), 520, 0.85);
     const parsed = dashboardAiInsightOutputSchema.safeParse(raw);
     if (!parsed.success) {
       return fallback;
@@ -241,7 +357,7 @@ export async function generateCatalogSuggestion(
   const fallback = fallbackCatalogSuggestion(input);
 
   try {
-    const raw = await runGeminiPrompt(buildCatalogPrompt(input), 420);
+    const raw = await runGeminiPrompt(buildCatalogPrompt(input), 420, 0.85);
     const parsed = catalogAiSuggestionOutputSchema.safeParse(raw);
     if (!parsed.success) {
       return fallback;

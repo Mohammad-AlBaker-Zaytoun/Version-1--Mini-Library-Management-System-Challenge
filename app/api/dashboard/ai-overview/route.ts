@@ -4,7 +4,7 @@ import { handleApiError } from '@/lib/api/errors';
 import { parseJsonBody } from '@/lib/api/request';
 import { requireApiUser } from '@/lib/auth/api-auth';
 import { dashboardAiInsightInputSchema } from '@/lib/schemas/ai';
-import { generateDashboardInsight } from '@/lib/services/ai-insights';
+import { generateDashboardInsight } from '@/lib/services/ai';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
