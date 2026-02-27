@@ -2,7 +2,7 @@
 
 Incremental, interview-focused project scaffold for building a mobile-first library platform with Next.js + Firebase + AI.
 
-Current status: **PR6 Circulation Workflows** (checkout/checkin APIs with immutable transaction history, role-aware permissions, and catalog/history UI integration).
+Current status: **PR7 AI Catalog Assistant** (admin metadata enrichment with Gemini, strict output validation, and graceful fallback output).
 
 ## Goals
 
@@ -18,7 +18,7 @@ Current status: **PR6 Circulation Workflows** (checkout/checkin APIs with immuta
 - Gemini API features
 - Vercel deployment
 
-## Current Scope (PR6)
+## Current Scope (PR7)
 
 - Next.js project initialized
 - Tailwind CSS + global theme tokens
@@ -76,6 +76,17 @@ Current status: **PR6 Circulation Workflows** (checkout/checkin APIs with immuta
     - `admin`: can process circulation across members (API supports `memberUid`)
   - `/catalog` now includes checkout/checkin actions with loading locks
   - `/history` now renders live timeline, action filters, and pagination
+- AI enrichment assistant (PR7):
+  - API endpoint:
+    - `POST /api/ai/enrich-book` (admin-only)
+  - admin book form now supports "Enrich with AI" action
+  - AI returns:
+    - short summary (`aiSummary`)
+    - suggested genre (`aiSuggestedGenre`)
+    - normalized tags
+  - output is schema-validated server-side before returning to client
+  - fallback enrichment is returned when Gemini is unavailable or invalid (source flag provided)
+  - Gemini key is used server-side only (`GEMINI_API_KEY` is never exposed in the browser)
 - SEO baseline:
   - root and per-page metadata
   - OpenGraph/Twitter cards
