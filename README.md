@@ -4,7 +4,7 @@
 
 Interview-focused, incremental implementation of a mobile-first library platform built with Next.js, Firebase, and practical AI features.
 
-Current status: **PR14 Catalog Componentization**.
+Current status: **PR15 SEO + README Polish**.
 
 ## Goals
 
@@ -300,11 +300,12 @@ firebase deploy --only firestore:indexes
 ## Demo Script (Interview)
 
 1. Sign in as admin.
-2. Go to `/admin/books`, create a book, run “Enrich with AI”, save.
+2. Go to `/admin/books`, create a book, run "Enrich with AI", save.
 3. Open `/catalog`, find the new book, checkout and checkin it.
 4. Open `/history`, show immutable checkout/checkin entries.
 5. Open `/dashboard`, toggle `3M/6M/12M`, explain utilization and overdue pressure.
 6. Sign in as member and show role-scoped differences.
+7. Open `/robots.txt` and `/sitemap.xml` to confirm SEO artifacts are published.
 
 ## Known Limitations (v1)
 

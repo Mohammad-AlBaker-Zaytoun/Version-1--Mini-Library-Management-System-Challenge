@@ -12,7 +12,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = new Date();
 
   return [
-    { url: `${baseUrl}/`, changeFrequency: 'weekly', priority: 1, lastModified },
-    { url: `${baseUrl}/login`, changeFrequency: 'monthly', priority: 0.8, lastModified },
+    // Keep sitemap scoped to indexable public pages.
+    { url: `${baseUrl}/`, changeFrequency: 'monthly', priority: 1, lastModified },
+    { url: `${baseUrl}/login`, changeFrequency: 'monthly', priority: 0.5, lastModified },
   ];
 }
