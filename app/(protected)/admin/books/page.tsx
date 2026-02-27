@@ -14,7 +14,11 @@ export const metadata: Metadata = {
 
 export default async function AdminBooksPage() {
   const user = await getSessionUser();
-  if (!user || user.role !== 'admin') {
+  if (!user) {
+    redirect('/login');
+  }
+
+  if (user.role !== 'admin') {
     redirect('/catalog');
   }
 

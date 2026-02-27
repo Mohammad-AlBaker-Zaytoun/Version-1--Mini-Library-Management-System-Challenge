@@ -4,7 +4,7 @@
 
 Interview-focused, incremental implementation of a mobile-first library platform built with Next.js, Firebase, and practical AI features.
 
-Current status: **PR18 Admin Route Cleanup**.
+Current status: **PR19 Protected Page Metadata and Guards**.
 
 ## Goals
 
@@ -171,6 +171,7 @@ erDiagram
 16. `refactor/16-history-component-relocation`
 17. `refactor/17-ai-service-consolidation`
 18. `chore/18-admin-route-cleanup`
+19. `chore/19-protected-page-metadata-guards`
 
 ## Environment Variables
 
