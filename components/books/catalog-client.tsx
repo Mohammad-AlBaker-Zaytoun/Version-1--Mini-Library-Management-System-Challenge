@@ -33,6 +33,7 @@ interface CatalogFilters {
   genre: string;
   tags: string;
   availability: AvailabilityFilter;
+  overdueOnly: boolean;
 }
 
 interface CatalogQueryState extends CatalogFilters {
@@ -54,6 +55,7 @@ const EMPTY_FILTERS: CatalogFilters = {
   genre: '',
   tags: '',
   availability: '',
+  overdueOnly: false,
 };
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -101,6 +103,7 @@ function parseCatalogQueryState(searchParams: ReadonlyURLSearchParams): CatalogQ
     genre: searchParams.get('genre') ?? '',
     tags: normalizeTagsInput(searchParams.get('tags') ?? ''),
     availability: safeAvailability,
+    overdueOnly: searchParams.get('overdue') === 'true',
     page: parsePage(searchParams.get('page')),
   };
 }
@@ -129,6 +132,10 @@ function createQueryString(state: CatalogQueryState): string {
     params.set('availability', state.availability);
   }
 
+  if (state.overdueOnly) {
+    params.set('overdue', 'true');
+  }
+
   if (state.page > 1) {
     params.set('page', String(state.page));
   }
@@ -142,7 +149,8 @@ function areFiltersEqual(first: CatalogFilters, second: CatalogFilters): boolean
     first.author === second.author &&
     first.genre === second.genre &&
     first.tags === second.tags &&
-    first.availability === second.availability
+    first.availability === second.availability &&
+    first.overdueOnly === second.overdueOnly
   );
 }
 
@@ -275,8 +283,16 @@ export function CatalogClient() {
       genre: urlState.genre,
       tags: urlState.tags,
       availability: urlState.availability,
+      overdueOnly: urlState.overdueOnly,
     }),
-    [urlState.author, urlState.availability, urlState.genre, urlState.q, urlState.tags],
+    [
+      urlState.author,
+      urlState.availability,
+      urlState.genre,
+      urlState.overdueOnly,
+      urlState.q,
+      urlState.tags,
+    ],
   );
 
   const [filters, setFilters] = useState<CatalogFilters>(urlFilters);
@@ -339,6 +355,7 @@ export function CatalogClient() {
             genre: urlState.genre,
             tags: urlState.tags,
             availability: urlState.availability,
+            overdueOnly: urlState.overdueOnly,
             page: payload.page,
           });
           const correctedHref = correctedQuery ? `${pathname}?${correctedQuery}` : pathname;
@@ -369,6 +386,7 @@ export function CatalogClient() {
     urlState.author,
     urlState.availability,
     urlState.genre,
+    urlState.overdueOnly,
     urlState.page,
     urlState.q,
     urlState.tags,
@@ -519,6 +537,21 @@ export function CatalogClient() {
                 </select>
               </div>
             </div>
+            <div className="sm:col-span-2">
+              <label
+                htmlFor="catalog-overdue-only"
+                className="inline-flex items-center gap-2 text-xs font-medium text-[var(--text-secondary)]"
+              >
+                <input
+                  id="catalog-overdue-only"
+                  type="checkbox"
+                  checked={filters.overdueOnly}
+                  onChange={(event) => updateFilter('overdueOnly', event.target.checked)}
+                  className="h-4 w-4 rounded border-[var(--border-subtle)] text-[var(--brand-primary)] focus:ring-[var(--brand-primary)]"
+                />
+                Overdue only
+              </label>
+            </div>
           </div>
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -595,9 +628,16 @@ export function CatalogClient() {
                     <h3 className="text-lg font-semibold leading-snug text-[var(--text-primary)]">
                       {book.title}
                     </h3>
-                    <Badge variant={book.availability === 'available' ? 'accent' : 'default'}>
-                      {book.availability === 'available' ? 'Available' : 'Checked out'}
-                    </Badge>
+                    <div className="flex flex-col items-end gap-1">
+                      <Badge variant={book.availability === 'available' ? 'accent' : 'default'}>
+                        {book.availability === 'available' ? 'Available' : 'Checked out'}
+                      </Badge>
+                      {overdue ? (
+                        <Badge variant="muted" className="bg-[#fdecea] text-[#b9352a]">
+                          Overdue
+                        </Badge>
+                      ) : null}
+                    </div>
                   </div>
 
                   <p className="text-sm text-[var(--text-secondary)]">by {book.author}</p>

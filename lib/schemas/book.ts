@@ -31,6 +31,7 @@ export const booksQuerySchema = z.object({
   genre: z.string().trim().optional(),
   tags: z.array(z.string().trim().min(1).max(40)).max(12).default([]),
   availability: z.enum(['available', 'checked_out']).optional(),
+  overdueOnly: z.boolean().optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(10),
 });

@@ -2,7 +2,7 @@
 
 Incremental, interview-focused project scaffold for building a mobile-first library platform with Next.js + Firebase + AI.
 
-Current status: **PR7 AI Catalog Assistant** (admin metadata enrichment with Gemini, strict output validation, and graceful fallback output).
+Current status: **PR8 Overdue + Analytics** (role-scoped dashboard metrics, monthly trend charts, and overdue tracking across catalog and dashboard).
 
 ## Goals
 
@@ -18,7 +18,7 @@ Current status: **PR7 AI Catalog Assistant** (admin metadata enrichment with Gem
 - Gemini API features
 - Vercel deployment
 
-## Current Scope (PR7)
+## Current Scope (PR8)
 
 - Next.js project initialized
 - Tailwind CSS + global theme tokens
@@ -87,6 +87,21 @@ Current status: **PR7 AI Catalog Assistant** (admin metadata enrichment with Gem
   - output is schema-validated server-side before returning to client
   - fallback enrichment is returned when Gemini is unavailable or invalid (source flag provided)
   - Gemini key is used server-side only (`GEMINI_API_KEY` is never exposed in the browser)
+- Overdue and analytics layer (PR8):
+  - analytics API endpoint:
+    - `GET /api/analytics/overview?range=3|6|12`
+  - role-scoped dashboard metrics:
+    - admin: organization-wide active loans, overdue pressure, utilization, monthly flow
+    - member: personal loan metrics with catalog context
+  - dashboard now includes:
+    - KPI cards
+    - month range toggle (`3M` / `6M` / `12M`)
+    - animated monthly checkout/checkin chart
+    - circulation composition donut and progress bars
+  - catalog search supports overdue filtering:
+    - query flag `overdue=true`
+    - UI toggle "Overdue only"
+    - overdue badge on book cards
 - SEO baseline:
   - root and per-page metadata
   - OpenGraph/Twitter cards
