@@ -4,7 +4,7 @@
 
 Interview-focused, incremental implementation of a mobile-first library platform built with Next.js, Firebase, and practical AI features.
 
-Current status: **PR12 Protected Route Group + App Shell**.
+Current status: **PR13 Dashboard Componentization**.
 
 ## Goals
 
@@ -48,6 +48,7 @@ Current status: **PR12 Protected Route Group + App Shell**.
   - `/api/analytics/overview?range=3|6|12`
   - role-scoped dashboard metrics
   - overdue pressure, utilization, monthly checkout/checkin charts
+  - modular dashboard components (`analytics-client`, `analytics-cards`, chart modules)
 - AI features:
   - admin metadata enrichment endpoint (`POST /api/ai/enrich-book`)
   - AI summary + genre + tag suggestions in admin book form
@@ -163,6 +164,7 @@ erDiagram
 10. `chore/10-firestore-seeding`
 11. `feat/11-dashboard-catalog-ai-insights`
 12. `feat/12-protected-layout-app-shell`
+13. `refactor/13-dashboard-componentization`
 
 ## Environment Variables
 
