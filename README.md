@@ -4,9 +4,7 @@
 
 Interview-ready, mobile-first library platform built with Next.js App Router, Firebase Auth/Firestore, and Gemini AI.
 
-Live URL: `TODO_ADD_VERCEL_URL`
-
-Replace `TODO_ADD_VERCEL_URL` before sharing the repository externally.
+Live URL: `https://version-1-mini-library-management-s.vercel.app`
 
 ## Table of Contents
 
@@ -414,8 +412,9 @@ Implemented baseline SEO:
 1. Import repository into Vercel.
 2. Add all env vars from `.env.example`.
 3. Deploy.
-4. In Firebase Auth, add your Vercel domain to authorized domains.
-5. Verify:
+4. Set `NEXT_PUBLIC_APP_URL=https://version-1-mini-library-management-s.vercel.app` in Vercel for production metadata, sitemap, and robots output.
+5. In Firebase Auth, add your Vercel domain to authorized domains.
+6. Verify:
    - `/robots.txt`
    - `/sitemap.xml`
    - Google SSO login in production
@@ -424,8 +423,8 @@ Implemented baseline SEO:
 
 Before sending this project to the company:
 
-1. Replace `TODO_ADD_VERCEL_URL` with the deployed Vercel URL.
-2. Verify Firebase Auth authorized domains include the production domain.
+1. Verify Firebase Auth authorized domains include `version-1-mini-library-management-s.vercel.app`.
+2. Confirm `NEXT_PUBLIC_APP_URL` is set to `https://version-1-mini-library-management-s.vercel.app` in Vercel.
 3. Seed the production/demo Firestore project with:
    - `pnpm seed:demo --admin-email=your-google-email@example.com`
 4. Smoke test:
