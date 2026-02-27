@@ -4,7 +4,7 @@
 
 Interview-focused, incremental implementation of a mobile-first library platform built with Next.js, Firebase, and practical AI features.
 
-Current status: **PR22 Auth Provider Token Normalization**.
+Current status: **PR23 Catalog AI Card Copy Polish**.
 
 ## Goals
 
@@ -175,6 +175,7 @@ erDiagram
 20. `chore/20-app-shell-refresh`
 21. `chore/21-seo-alignment`
 22. `chore/22-auth-provider-token-normalization`
+23. `chore/23-catalog-ai-card-copy-polish`
 
 ## Environment Variables
 
