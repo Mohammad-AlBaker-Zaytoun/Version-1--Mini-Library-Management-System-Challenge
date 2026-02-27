@@ -4,7 +4,7 @@
 
 Interview-focused, incremental implementation of a mobile-first library platform built with Next.js, Firebase, and practical AI features.
 
-Current status: **PR21 SEO Alignment**.
+Current status: **PR22 Auth Provider Token Normalization**.
 
 ## Goals
 
@@ -174,6 +174,7 @@ erDiagram
 19. `chore/19-protected-page-metadata-guards`
 20. `chore/20-app-shell-refresh`
 21. `chore/21-seo-alignment`
+22. `chore/22-auth-provider-token-normalization`
 
 ## Environment Variables
 

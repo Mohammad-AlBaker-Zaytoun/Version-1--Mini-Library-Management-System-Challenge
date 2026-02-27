@@ -5,6 +5,7 @@ import { getSessionUser } from '@/lib/auth/api-auth';
 
 export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
+
   if (!user) {
     redirect('/login');
   }
