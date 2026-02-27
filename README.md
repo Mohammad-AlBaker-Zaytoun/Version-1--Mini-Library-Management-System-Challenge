@@ -27,7 +27,6 @@ Live URL: `https://version-1-mini-library-management-s.vercel.app`
 - [Deployment (Vercel)](#deployment-vercel)
 - [Submission Checklist](#submission-checklist)
 - [Branch and PR Strategy](#branch-and-pr-strategy)
-- [Interview Demo Script](#interview-demo-script)
 - [Known Limitations (v1)](#known-limitations-v1)
 
 ## What This Project Demonstrates
@@ -468,21 +467,6 @@ The project started with the original 10-PR roadmap, then added focused refineme
 24. `test/24-unit-test-alignment`
 25. `test/25-playwright-alignment`
 26. `chore/26-final-snapshot-alignment`
-
-## Interview Demo Script
-
-1. Sign in with Google as admin.
-2. Open `Manage Books` and create/edit/delete one book.
-3. Use AI enrichment in the admin form.
-4. Go to `Catalog`, search/filter, checkout a book.
-5. Open `History` and show immutable ledger entries.
-6. Open `Dashboard` and show:
-   - active loans
-   - overdue count
-   - trend charts with tooltips and range toggles
-   - AI operations brief
-7. Return to `Catalog` and show AI next-book recommendation.
-8. Run `pnpm seed:demo --admin-email=<your-email>` to demonstrate repeatable state reset.
 
 ## Known Limitations (v1)
 
