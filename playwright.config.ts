@@ -1,14 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
-  testDir: 'tests/e2e',
-  timeout: 60_000,
-  expect: {
-    timeout: 10_000,
-  },
+  testDir: './e2e',
+  timeout: 30_000,
+  fullyParallel: true,
+  retries: process.env.CI ? 2 : 0,
+  reporter: [['list'], ['html', { outputFolder: 'playwright-report' }]],
   use: {
-    baseURL: 'http://localhost:3100',
-    trace: 'on-first-retry',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:3000',
+    trace: 'retain-on-failure',
   },
   projects: [
     {
@@ -17,22 +17,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm dev --port 3100',
-    url: 'http://localhost:3100/login',
+    command: 'pnpm dev',
+    url: 'http://127.0.0.1:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
-    env: {
-      NEXT_PUBLIC_APP_URL: 'http://localhost:3100',
-      NEXT_PUBLIC_FIREBASE_API_KEY: 'test-api-key',
-      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: 'test-project.firebaseapp.com',
-      NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'test-project',
-      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: 'test-project.appspot.com',
-      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '1234567890',
-      NEXT_PUBLIC_FIREBASE_APP_ID: '1:1234567890:web:test',
-      FIREBASE_PROJECT_ID: 'test-project',
-      FIREBASE_CLIENT_EMAIL: 'firebase-adminsdk@test-project.iam.gserviceaccount.com',
-      FIREBASE_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\\nTEST\\n-----END PRIVATE KEY-----\\n',
-      GEMINI_API_KEY: 'test-gemini-key',
-    },
   },
 });
