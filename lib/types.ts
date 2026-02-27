@@ -51,6 +51,19 @@ export interface CirculationTransaction {
   createdAt: string;
 }
 
+export interface CirculationMutationResponse {
+  book: Book;
+  transaction: CirculationTransaction;
+}
+
+export interface CirculationHistoryResponse {
+  items: CirculationTransaction[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
 export interface ApiUserContext {
   uid: string;
   email: string;

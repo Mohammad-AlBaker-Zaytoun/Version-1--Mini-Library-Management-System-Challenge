@@ -7,7 +7,7 @@ import { getSessionUser } from '@/lib/auth/api-auth';
 
 export const metadata: Metadata = {
   title: 'Catalog',
-  description: 'Browse and search the catalog with mobile-first interactions.',
+  description: 'Browse, search, checkout, and return books with mobile-first interactions.',
   alternates: {
     canonical: '/catalog',
   },
@@ -22,7 +22,7 @@ export default async function CatalogPage() {
   return (
     <PublicAppShell
       pageTitle="Catalog"
-      pageDescription="Search by title, author, genre, tags, and availability with mobile-first filters and URL-synced pagination."
+      pageDescription="Search by title, author, genre, tags, and availability, then process checkout and checkin actions with role-aware controls."
     >
       <CatalogClient />
     </PublicAppShell>
