@@ -4,7 +4,7 @@
 
 Interview-focused, incremental implementation of a mobile-first library platform built with Next.js, Firebase, and practical AI features.
 
-Current status: **PR13 Dashboard Componentization**.
+Current status: **PR14 Catalog Componentization**.
 
 ## Goals
 
@@ -40,6 +40,7 @@ Current status: **PR13 Dashboard Componentization**.
   - availability + overdue filters
   - URL-synced query state and pagination
   - checkout/checkin actions with lock/loading states
+  - modular catalog components (`catalog-client`, `search-filters`, `book-grid`)
 - Circulation:
   - checkout/checkin API workflows
   - immutable transaction ledger (`circulationTransactions`)
@@ -165,6 +166,7 @@ erDiagram
 11. `feat/11-dashboard-catalog-ai-insights`
 12. `feat/12-protected-layout-app-shell`
 13. `refactor/13-dashboard-componentization`
+14. `refactor/14-catalog-componentization`
 
 ## Environment Variables
 
