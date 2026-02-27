@@ -4,7 +4,7 @@
 
 Interview-focused, incremental implementation of a mobile-first library platform built with Next.js, Firebase, and practical AI features.
 
-Current status: **PR23 Catalog AI Card Copy Polish**.
+Current status: **PR24 Unit Test Alignment**.
 
 ## Goals
 
@@ -176,6 +176,7 @@ erDiagram
 21. `chore/21-seo-alignment`
 22. `chore/22-auth-provider-token-normalization`
 23. `chore/23-catalog-ai-card-copy-polish`
+24. `test/24-unit-test-alignment`
 
 ## Environment Variables
 
