@@ -74,6 +74,32 @@ export function AdminBooksClient() {
     }
   }
 
+  async function handleEnrichment(payload: {
+    title: string;
+    author: string;
+    description?: string;
+    genre?: string;
+    tags: string[];
+  }) {
+    setError(null);
+    const response = await authFetch('/api/ai/enrich-book', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const message = await getErrorMessage(response, 'AI enrichment failed');
+      setError(message);
+      throw new Error(message);
+    }
+
+    return (await response.json()) as {
+      summary: string;
+      suggestedGenre: string;
+      suggestedTags: string[];
+    };
+  }
+
   async function createBook(payload: {
     title: string;
     author: string;
@@ -185,7 +211,7 @@ export function AdminBooksClient() {
           Book Management
         </h1>
         <p className="text-sm text-[var(--text-muted)]">
-          Admin-only CRUD with validation and audit-friendly metadata.
+          Admin-only CRUD with AI-assisted metadata enrichment.
         </p>
       </div>
 
@@ -209,7 +235,13 @@ export function AdminBooksClient() {
         </Card>
       ) : null}
 
-      <BookForm mode="create" loading={isSaving} disabled={isLocked} onSubmit={createBook} />
+      <BookForm
+        mode="create"
+        loading={isSaving}
+        disabled={isLocked}
+        onSubmit={createBook}
+        onEnrich={handleEnrichment}
+      />
 
       {editingBook ? (
         <BookForm
@@ -223,6 +255,7 @@ export function AdminBooksClient() {
               setEditingBook(null);
             }
           }}
+          onEnrich={handleEnrichment}
         />
       ) : null}
 

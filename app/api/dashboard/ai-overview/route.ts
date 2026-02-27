@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { handleApiError } from '@/lib/api/errors';
-import { parseJsonBody } from '@/lib/api/request';
 import { requireApiUser } from '@/lib/auth/api-auth';
-import { dashboardAiInsightInputSchema } from '@/lib/schemas/ai';
+import { parseJsonBody } from '@/lib/api/request';
+import { aiDashboardInsightInputSchema } from '@/lib/schemas/ai';
 import { generateDashboardInsight } from '@/lib/services/ai';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -11,7 +11,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     await requireApiUser(request);
 
     const body = await parseJsonBody(request);
-    const parsedBody = dashboardAiInsightInputSchema.safeParse(body);
+    const parsedBody = aiDashboardInsightInputSchema.safeParse(body);
 
     if (!parsedBody.success) {
       return NextResponse.json(

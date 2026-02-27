@@ -1,375 +1,304 @@
+import { GoogleGenAI } from '@google/genai';
+
 import { getServerEnv } from '@/lib/env';
 import {
-  catalogAiSuggestionOutputSchema,
-  geminiEnrichmentSchema,
-  dashboardAiInsightOutputSchema,
-  type CatalogAiSuggestionInput,
-  type CatalogAiSuggestionOutput,
-  type DashboardAiInsightInput,
-  type DashboardAiInsightOutput,
-  type EnrichBookRequestInput,
+  aiCatalogSuggestionOutputSchema,
+  aiDashboardInsightOutputSchema,
+  aiEnrichmentOutputSchema,
+  type AiCatalogSuggestionInput,
+  type AiCatalogSuggestionOutput,
+  type AiDashboardInsightInput,
+  type AiDashboardInsightOutput,
+  type AiEnrichmentInput,
+  type AiEnrichmentOutput,
 } from '@/lib/schemas/ai';
-import { normalizeTags } from '@/lib/services/book-utils';
-import type { BookAiEnrichmentResponse } from '@/lib/types';
-import { toTitleCase } from '@/lib/utils';
 
-const GEMINI_MODEL = 'gemini-1.5-flash';
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
-const REQUEST_TIMEOUT_MS = 12000;
+let aiClient: GoogleGenAI | null = null;
 
-const COMMON_STOPWORDS = new Set([
-  'and',
-  'the',
-  'for',
-  'with',
-  'from',
-  'into',
-  'about',
-  'this',
-  'that',
-  'book',
-  'story',
-  'novel',
-  'guide',
-  'edition',
-]);
-
-interface GeminiGenerateContentResponse {
-  candidates?: Array<{
-    content?: {
-      parts?: Array<{
-        text?: string;
-      }>;
-    };
-  }>;
-}
-
-function truncate(value: string, maxLength: number): string {
-  if (value.length <= maxLength) {
-    return value;
+function getAiClient(): GoogleGenAI {
+  if (aiClient) {
+    return aiClient;
   }
 
-  return `${value.slice(0, maxLength - 3).trimEnd()}...`;
+  aiClient = new GoogleGenAI({ apiKey: getServerEnv().GEMINI_API_KEY });
+  return aiClient;
 }
 
-function extractResponseText(response: GeminiGenerateContentResponse): string {
-  const parts = response.candidates?.[0]?.content?.parts ?? [];
-  const text = parts
-    .map((part) => part.text)
-    .filter((value): value is string => typeof value === 'string')
-    .join('\n')
-    .trim();
+function fallbackEnrichment(input: AiEnrichmentInput): AiEnrichmentOutput {
+  const base = input.description?.trim() || `${input.title} by ${input.author}.`;
+  const summary = base.length > 280 ? `${base.slice(0, 277)}...` : base;
 
-  if (!text) {
-    throw new Error('Gemini response contained no text');
-  }
-
-  return text;
-}
-
-function extractJsonPayload(rawText: string): unknown {
-  const fencedJsonMatch =
-    rawText.match(/```json\s*([\s\S]*?)\s*```/i) ?? rawText.match(/```\s*([\s\S]*?)\s*```/i);
-  const cleanPayload = (fencedJsonMatch ? fencedJsonMatch[1] : rawText).trim();
-  return JSON.parse(cleanPayload);
-}
-
-async function runGeminiPrompt(
-  prompt: string,
-  maxOutputTokens: number,
-  topP: number,
-): Promise<unknown> {
-  const env = getServerEnv();
-  const controller = new AbortController();
-  const timeout = setTimeout(() => {
-    controller.abort();
-  }, REQUEST_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(
-      `${GEMINI_ENDPOINT}?key=${encodeURIComponent(env.GEMINI_API_KEY)}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: prompt }],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.2,
-            topP,
-            maxOutputTokens,
-            responseMimeType: 'application/json',
-          },
-        }),
-        signal: controller.signal,
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(`Gemini request failed (${response.status})`);
-    }
-
-    const payload = (await response.json()) as GeminiGenerateContentResponse;
-    const text = extractResponseText(payload);
-    return extractJsonPayload(text);
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-function toKeywordTags(input: EnrichBookRequestInput): string[] {
-  const titleTags = input.title
-    .split(/[^a-zA-Z0-9]+/)
-    .map((segment) => segment.trim().toLowerCase())
-    .filter((segment) => segment.length >= 4 && !COMMON_STOPWORDS.has(segment))
-    .slice(0, 3)
-    .map((segment) => toTitleCase(segment));
-
-  const fallbackTags = [
-    ...(input.genre ? [toTitleCase(input.genre)] : []),
-    ...input.tags.map((tag) => toTitleCase(tag)),
-    ...titleTags,
+  const candidateTags = [
+    ...(input.tags ?? []),
+    ...(input.genre ? [input.genre] : []),
+    ...input.title
+      .split(' ')
+      .filter((word) => word.length > 4)
+      .slice(0, 4),
   ];
 
-  return normalizeTags(fallbackTags).slice(0, 8);
-}
-
-function buildFallbackEnrichment(input: EnrichBookRequestInput): BookAiEnrichmentResponse {
-  const tags = toKeywordTags(input);
-  const suggestedGenre = input.genre?.trim() ? toTitleCase(input.genre) : (tags[0] ?? 'General');
-
-  const shortDescription = input.description
-    ?.trim()
-    .split(/(?<=[.!?])\s+/)[0]
-    ?.trim();
-
-  const yearText = typeof input.publishedYear === 'number' ? ` (${input.publishedYear})` : '';
-  const baseSummary = shortDescription
-    ? shortDescription
-    : `${input.title}${yearText} by ${input.author} is a ${suggestedGenre.toLowerCase()} catalog title suitable for readers interested in ${tags.slice(0, 3).join(', ') || 'new discoveries'}.`;
+  const uniqueTags = [...new Set(candidateTags.map((tag) => tag.trim()).filter(Boolean))].slice(
+    0,
+    6,
+  );
 
   return {
-    aiSummary: truncate(baseSummary, 600),
-    aiSuggestedGenre: truncate(suggestedGenre, 80),
-    tags: tags.length > 0 ? tags : ['General'],
-    source: 'fallback',
+    summary: summary.length < 20 ? `${input.title} is a notable work by ${input.author}.` : summary,
+    suggestedGenre: input.genre?.trim() || 'General Fiction',
+    suggestedTags: uniqueTags.length >= 2 ? uniqueTags : ['Library Pick', 'Recommended'],
   };
 }
 
-function buildEnrichmentPrompt(input: EnrichBookRequestInput): string {
-  const seedTags = input.tags.length > 0 ? input.tags.join(', ') : 'none';
-
-  return [
-    'You are assisting a library administrator with metadata enrichment.',
-    'Return only JSON with this exact shape:',
-    '{"summary":"string","suggestedGenre":"string","tags":["string"]}',
-    'Rules:',
-    '- summary: objective, concise, max 280 characters.',
-    '- suggestedGenre: single genre phrase, max 40 characters.',
-    '- tags: 4-8 distinct tags, each max 24 characters.',
-    '- Avoid markdown, commentary, or code fences.',
-    '',
-    'Book input:',
-    `title: ${input.title}`,
-    `author: ${input.author}`,
-    `isbn: ${input.isbn?.trim() || 'n/a'}`,
-    `genre: ${input.genre?.trim() || 'n/a'}`,
-    `publishedYear: ${typeof input.publishedYear === 'number' ? input.publishedYear : 'n/a'}`,
-    `description: ${input.description?.trim() || 'n/a'}`,
-    `existingTags: ${seedTags}`,
-  ].join('\n');
+function buildPrompt(input: AiEnrichmentInput): string {
+  return `You are a cataloging assistant for a modern library management system.
+Return a strict JSON object with keys: summary, suggestedGenre, suggestedTags.
+Constraints:
+- summary: 2 to 4 concise sentences, max 400 chars.
+- suggestedGenre: one normalized genre label.
+- suggestedTags: 3 to 8 short tags.
+Book context:
+Title: ${input.title}
+Author: ${input.author}
+Current genre: ${input.genre ?? 'N/A'}
+Current tags: ${(input.tags ?? []).join(', ') || 'N/A'}
+Description: ${input.description ?? 'N/A'}
+`;
 }
 
-async function runGeminiEnrichment(input: EnrichBookRequestInput) {
-  const raw = await runGeminiPrompt(buildEnrichmentPrompt(input), 320, 0.9);
-  return geminiEnrichmentSchema.parse(raw);
-}
-
-export async function enrichBookMetadata(
-  input: EnrichBookRequestInput,
-): Promise<BookAiEnrichmentResponse> {
-  const fallback = buildFallbackEnrichment(input);
-
+export async function generateBookEnrichment(
+  input: AiEnrichmentInput,
+): Promise<AiEnrichmentOutput> {
   try {
-    const aiOutput = await runGeminiEnrichment(input);
-    return {
-      aiSummary: truncate(aiOutput.summary.trim(), 600),
-      aiSuggestedGenre: truncate(aiOutput.suggestedGenre.trim(), 80),
-      tags: normalizeTags(aiOutput.tags).slice(0, 12),
-      source: 'ai',
-    };
+    const response = await getAiClient().models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: buildPrompt(input),
+      config: {
+        temperature: 0.2,
+        topP: 0.8,
+        responseMimeType: 'application/json',
+      },
+    });
+
+    const text = response.text?.trim();
+    if (!text) {
+      return fallbackEnrichment(input);
+    }
+
+    const parsed = JSON.parse(text) as unknown;
+    const validated = aiEnrichmentOutputSchema.safeParse(parsed);
+
+    if (!validated.success) {
+      return fallbackEnrichment(input);
+    }
+
+    return validated.data;
   } catch {
-    return fallback;
+    return fallbackEnrichment(input);
   }
 }
 
-function fallbackDashboardInsight(input: DashboardAiInsightInput): DashboardAiInsightOutput {
+function fallbackDashboardInsight(input: AiDashboardInsightInput): AiDashboardInsightOutput {
+  const utilization =
+    input.totalBooks > 0 ? Math.round((input.activeLoans / input.totalBooks) * 100) : 0;
   const overdueRate =
     input.activeLoans > 0 ? Math.round((input.overdueCount / input.activeLoans) * 100) : 0;
-  const latestCheckout = input.monthlyCheckouts.at(-1)?.count ?? 0;
-  const previousCheckout = input.monthlyCheckouts.at(-2)?.count ?? latestCheckout;
-  const checkoutDelta = latestCheckout - previousCheckout;
-  const healthStatus: DashboardAiInsightOutput['healthStatus'] =
+
+  const recent = input.monthlyCheckouts.slice(-3);
+  const recentAverage =
+    recent.length > 0
+      ? Math.round(recent.reduce((sum, month) => sum + month.count, 0) / recent.length)
+      : 0;
+  const latest = input.monthlyCheckouts.at(-1)?.count ?? 0;
+  const previous = input.monthlyCheckouts.at(-2)?.count ?? latest;
+  const delta = latest - previous;
+
+  const healthStatus: AiDashboardInsightOutput['healthStatus'] =
     overdueRate >= 35 ? 'critical' : overdueRate >= 20 ? 'watch' : 'stable';
 
   const trendText =
-    checkoutDelta === 0
-      ? 'Checkout activity is stable month-over-month.'
-      : `Checkout activity moved by ${Math.abs(checkoutDelta)} ${checkoutDelta > 0 ? 'up' : 'down'} compared with the previous month.`;
+    delta === 0
+      ? 'Checkout activity is flat month over month.'
+      : `Checkout activity is ${delta > 0 ? 'up' : 'down'} by ${Math.abs(delta)} compared to the prior month.`;
 
   return {
-    overview: `Current utilization is ${input.utilizationRate}% with ${input.activeLoans} active loans and ${input.overdueCount} overdue. ${trendText}`,
+    overview: `Current utilization is ${utilization}% with ${input.activeLoans} active loans and ${input.overdueCount} overdue items. ${trendText}`,
     healthStatus,
     highlights: [
-      `${input.availableBooks} books are currently available out of ${input.totalBooks}.`,
+      `${input.totalBooks} total books are currently tracked in this dashboard scope.`,
+      `${input.activeLoans} books are checked out and ${Math.max(0, input.totalBooks - input.activeLoans)} are available.`,
       `Overdue pressure is ${overdueRate}% of active loans.`,
-      `${input.scope === 'admin' ? 'Organization' : 'Member'} scope is currently in ${healthStatus} status.`,
-    ],
+      `Average monthly checkouts over the latest ${recent.length || 1} months: ${recentAverage}.`,
+    ].slice(0, 4),
     recommendations: [
       overdueRate >= 20
-        ? 'Prioritize overdue reminders and check-in follow-up this week.'
-        : 'Maintain current overdue follow-up rhythm and monitor weekly.',
-      input.utilizationRate >= 75
-        ? 'Consider expanding high-demand inventory to relieve utilization pressure.'
-        : 'Promote available catalog inventory to increase healthy circulation.',
-      checkoutDelta < 0
-        ? 'Run a short campaign to recover checkout momentum.'
-        : 'Continue highlighting popular genres to sustain circulation pace.',
+        ? 'Prioritize reminders and follow-ups for overdue borrowers this week.'
+        : 'Maintain current circulation cadence and continue weekly overdue monitoring.',
+      utilization >= 75
+        ? 'Consider increasing high-demand inventory to reduce availability constraints.'
+        : 'Use available inventory to promote circulation with targeted member picks.',
+      delta < 0
+        ? 'Run a short-term campaign to recover checkout momentum.'
+        : 'Sustain current checkout momentum with rotating highlighted titles.',
     ],
   };
 }
 
-function buildDashboardPrompt(input: DashboardAiInsightInput): string {
-  const checkoutSeries = input.monthlyCheckouts.map((item) => `${item.month}:${item.count}`).join(', ');
-  const checkinSeries = input.monthlyCheckins.map((item) => `${item.month}:${item.count}`).join(', ');
+function buildDashboardPrompt(input: AiDashboardInsightInput): string {
+  const recentMonths = input.monthlyCheckouts
+    .slice(-12)
+    .map((item) => `${item.month}: ${item.count}`)
+    .join('; ');
 
-  return [
-    'You are an operations analyst for a library management platform.',
-    'Return only JSON with this exact shape:',
-    '{"overview":"string","healthStatus":"stable|watch|critical","highlights":["string"],"recommendations":["string"]}',
-    'Rules:',
-    '- overview: 2-4 concise sentences, max 800 chars.',
-    '- highlights: 2-5 concise bullets.',
-    '- recommendations: 2-5 actionable bullets.',
-    '- healthStatus must be stable, watch, or critical.',
-    '- No markdown, no code fences, no extra keys.',
-    '',
-    'Dashboard input:',
-    `scope: ${input.scope}`,
-    `totalBooks: ${input.totalBooks}`,
-    `availableBooks: ${input.availableBooks}`,
-    `activeLoans: ${input.activeLoans}`,
-    `overdueCount: ${input.overdueCount}`,
-    `utilizationRate: ${input.utilizationRate}`,
-    `monthlyCheckouts: ${checkoutSeries || 'none'}`,
-    `monthlyCheckins: ${checkinSeries || 'none'}`,
-  ].join('\n');
+  return `You are an operations analyst for a library platform.
+Return strict JSON with keys: overview, healthStatus, highlights, recommendations.
+Constraints:
+- overview: 2-4 sentences, concrete, no fluff, max 700 chars.
+- healthStatus: one of stable, watch, critical.
+- highlights: 2-5 concise bullets.
+- recommendations: 2-5 actionable bullets, operational and realistic.
+Use only this dashboard data:
+totalBooks=${input.totalBooks}
+activeLoans=${input.activeLoans}
+overdueCount=${input.overdueCount}
+monthlyCheckouts=${recentMonths || 'none'}
+`;
 }
 
 export async function generateDashboardInsight(
-  input: DashboardAiInsightInput,
-): Promise<DashboardAiInsightOutput> {
-  const fallback = fallbackDashboardInsight(input);
-
+  input: AiDashboardInsightInput,
+): Promise<AiDashboardInsightOutput> {
   try {
-    const raw = await runGeminiPrompt(buildDashboardPrompt(input), 520, 0.85);
-    const parsed = dashboardAiInsightOutputSchema.safeParse(raw);
-    if (!parsed.success) {
-      return fallback;
+    const response = await getAiClient().models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: buildDashboardPrompt(input),
+      config: {
+        temperature: 0.2,
+        topP: 0.8,
+        responseMimeType: 'application/json',
+      },
+    });
+
+    const text = response.text?.trim();
+    if (!text) {
+      return fallbackDashboardInsight(input);
     }
 
-    return parsed.data;
+    const parsed = JSON.parse(text) as unknown;
+    const validated = aiDashboardInsightOutputSchema.safeParse(parsed);
+    if (!validated.success) {
+      return fallbackDashboardInsight(input);
+    }
+
+    return validated.data;
   } catch {
-    return fallback;
+    return fallbackDashboardInsight(input);
   }
 }
 
-function fallbackCatalogSuggestion(input: CatalogAiSuggestionInput): CatalogAiSuggestionOutput {
+function fallbackCatalogSuggestion(input: AiCatalogSuggestionInput): AiCatalogSuggestionOutput {
   const first = input.candidateBooks[0];
   if (!first) {
     return {
-      recommendedBookId: 'none',
-      reason: 'No candidate books were available for recommendation.',
+      recommendedBookId: 'fallback',
+      reason:
+        'A strong recommendation could not be generated because there are no candidate books available.',
       whyItFits: [
-        'No available inventory matched your recommendation request.',
-        'Try again after catalog availability changes.',
+        'No available catalog candidates were provided for recommendation.',
+        'Refresh after inventory changes to generate a personalized suggestion.',
       ],
     };
   }
 
   const topGenre = input.favoriteGenres[0];
-  const topTag = input.favoriteTags[0];
+  const topAuthor = input.favoriteAuthors[0];
+
+  const matchReasons = [
+    topGenre && first.genre && first.genre.toLowerCase() === topGenre.toLowerCase()
+      ? `It aligns with your frequent ${topGenre} checkouts.`
+      : null,
+    topAuthor && first.author.toLowerCase() === topAuthor.toLowerCase()
+      ? `You have engaged with this author in prior circulation activity.`
+      : null,
+    first.tags.some((tag) => input.favoriteTags.map((value) => value.toLowerCase()).includes(tag.toLowerCase()))
+      ? `Its tags overlap with themes from your borrowing history.`
+      : null,
+  ].filter(Boolean) as string[];
+
+  const whyItFits =
+    matchReasons.length >= 2
+      ? matchReasons.slice(0, 3)
+      : [
+          `It fits your checkout pattern from ${input.checkoutCount} recorded loans.`,
+          `It is currently available and well-positioned for your next borrow.`,
+          `The topic profile is similar to books in your recent circulation history.`,
+        ];
 
   return {
     recommendedBookId: first.id,
-    reason: `Based on ${input.checkoutCount} prior checkouts, "${first.title}" is a strong next pick that fits your recent reading pattern and current catalog availability.`,
-    whyItFits: [
-      topGenre && first.genre
-        ? `It aligns with your frequent ${topGenre} borrowing preference.`
-        : 'It matches your recent circulation behavior.',
-      topTag
-        ? `Its themes overlap with your preferred tags, including ${topTag}.`
-        : 'Its topic profile is close to what you usually borrow.',
-      'It is available now, so you can check it out immediately.',
-    ],
+    reason: `Based on your circulation history and available catalog options, "${first.title}" is a strong next checkout candidate.`,
+    whyItFits,
   };
 }
 
-function buildCatalogPrompt(input: CatalogAiSuggestionInput): string {
+function buildCatalogSuggestionPrompt(input: AiCatalogSuggestionInput): string {
   const candidateLines = input.candidateBooks
     .map(
       (candidate) =>
-        `${candidate.id} | ${candidate.title} | ${candidate.author} | genre=${candidate.genre || 'n/a'} | tags=${candidate.tags.join(', ') || 'n/a'} | description=${candidate.description || 'n/a'}`,
+        `${candidate.id} | ${candidate.title} | ${candidate.author} | genre=${candidate.genre || 'N/A'} | tags=${candidate.tags.join(', ') || 'N/A'} | description=${candidate.description || 'N/A'}`,
     )
     .join('\n');
 
-  return [
-    'You are an AI librarian recommending the next book for one member.',
-    'Return only JSON with this exact shape:',
-    '{"recommendedBookId":"string","reason":"string","whyItFits":["string"]}',
-    'Rules:',
-    '- recommendedBookId must be one of candidateBooks ids.',
-    '- reason: 2-4 concise sentences, max 550 chars, evidence-based.',
-    '- whyItFits: 2-5 concise bullets.',
-    '- No markdown, no code fences, no extra keys.',
-    '',
-    'Member input:',
-    `displayName: ${input.userDisplayName}`,
-    `checkoutCount: ${input.checkoutCount}`,
-    `checkinCount: ${input.checkinCount}`,
-    `favoriteGenres: ${input.favoriteGenres.join(', ') || 'none'}`,
-    `favoriteTags: ${input.favoriteTags.join(', ') || 'none'}`,
-    `recentTitles: ${input.recentTitles.join(', ') || 'none'}`,
-    'candidateBooks:',
-    candidateLines,
-  ].join('\n');
+  return `You are an AI librarian recommending the next book for one specific user.
+Return strict JSON with keys: recommendedBookId, reason, whyItFits.
+Constraints:
+- recommendedBookId: must be one id from candidateBooks.
+- reason: 2-4 concise sentences, max 500 chars, concrete and evidence-based.
+- whyItFits: 2-5 concise bullet-style statements.
+User context:
+displayName=${input.userDisplayName}
+checkoutCount=${input.checkoutCount}
+checkinCount=${input.checkinCount}
+favoriteGenres=${input.favoriteGenres.join(', ') || 'N/A'}
+favoriteAuthors=${input.favoriteAuthors.join(', ') || 'N/A'}
+favoriteTags=${input.favoriteTags.join(', ') || 'N/A'}
+recentTitles=${input.recentTitles.join(', ') || 'N/A'}
+candidateBooks:
+${candidateLines}
+`;
 }
 
 export async function generateCatalogSuggestion(
-  input: CatalogAiSuggestionInput,
-): Promise<CatalogAiSuggestionOutput> {
-  const fallback = fallbackCatalogSuggestion(input);
-
+  input: AiCatalogSuggestionInput,
+): Promise<AiCatalogSuggestionOutput> {
   try {
-    const raw = await runGeminiPrompt(buildCatalogPrompt(input), 420, 0.85);
-    const parsed = catalogAiSuggestionOutputSchema.safeParse(raw);
-    if (!parsed.success) {
-      return fallback;
+    const response = await getAiClient().models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: buildCatalogSuggestionPrompt(input),
+      config: {
+        temperature: 0.2,
+        topP: 0.8,
+        responseMimeType: 'application/json',
+      },
+    });
+
+    const text = response.text?.trim();
+    if (!text) {
+      return fallbackCatalogSuggestion(input);
+    }
+
+    const parsed = JSON.parse(text) as unknown;
+    const validated = aiCatalogSuggestionOutputSchema.safeParse(parsed);
+    if (!validated.success) {
+      return fallbackCatalogSuggestion(input);
     }
 
     const candidateIds = new Set(input.candidateBooks.map((candidate) => candidate.id));
-    if (!candidateIds.has(parsed.data.recommendedBookId)) {
-      return fallback;
+    if (!candidateIds.has(validated.data.recommendedBookId)) {
+      return fallbackCatalogSuggestion(input);
     }
 
-    return parsed.data;
+    return validated.data;
   } catch {
-    return fallback;
+    return fallbackCatalogSuggestion(input);
   }
 }

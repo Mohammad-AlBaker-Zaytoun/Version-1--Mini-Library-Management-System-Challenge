@@ -1,28 +1,16 @@
-import { notFound } from '@/lib/api/errors';
-import { getAdminDb } from '@/lib/firebase/admin';
-import type { BookUpdateInput, BooksQueryInput, BookWriteInput } from '@/lib/schemas/book';
-import { createSearchBlob, normalizeTags } from '@/lib/services/book-utils';
-import { filterBooks, paginate } from '@/lib/services/search';
+﻿import { getAdminDb } from '@/lib/firebase/admin';
 import type { Book, BooksListResponse } from '@/lib/types';
+import type { BookUpdateInput, BookWriteInput, BooksQueryInput } from '@/lib/schemas/book';
+import { notFound } from '@/lib/api/errors';
 import { nowIso } from '@/lib/utils';
+import { filterBooks, paginate } from '@/lib/services/search';
+import { createSearchBlob, normalizeTags } from '@/lib/services/book-utils';
 
 const BOOKS_COLLECTION = 'books';
 
 function normalizeOptional(value?: string): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
-}
-
-function sortByUpdatedAtDesc(items: Book[]): Book[] {
-  return [...items].sort((first, second) => second.updatedAt.localeCompare(first.updatedAt));
-}
-
-function isMissingIndexError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-
-  return error.message.toLowerCase().includes('requires an index');
 }
 
 export async function createBook(input: BookWriteInput, actorUid: string): Promise<Book> {
@@ -114,26 +102,13 @@ export async function deleteBook(bookId: string): Promise<void> {
 }
 
 export async function searchBooks(query: BooksQueryInput): Promise<BooksListResponse> {
-  const booksCollection = getAdminDb().collection(BOOKS_COLLECTION);
+  const snapshot = await getAdminDb()
+    .collection(BOOKS_COLLECTION)
+    .orderBy('updatedAt', 'desc')
+    .limit(500)
+    .get();
 
-  let snapshot;
-  try {
-    snapshot = query.availability
-      ? await booksCollection
-          .where('availability', '==', query.availability)
-          .orderBy('updatedAt', 'desc')
-          .limit(600)
-          .get()
-      : await booksCollection.orderBy('updatedAt', 'desc').limit(600).get();
-  } catch (error) {
-    if (!query.availability || !isMissingIndexError(error)) {
-      throw error;
-    }
-
-    snapshot = await booksCollection.where('availability', '==', query.availability).limit(600).get();
-  }
-
-  const allBooks = sortByUpdatedAtDesc(snapshot.docs.map((doc) => doc.data() as Book));
+  const allBooks = snapshot.docs.map((doc) => doc.data() as Book);
   const filtered = filterBooks(allBooks, query);
   const paginated = paginate(filtered, query.page, query.limit);
 

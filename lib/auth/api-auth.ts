@@ -89,17 +89,9 @@ export async function getSessionUser(): Promise<ApiUserContext | null> {
     return null;
   }
 
-  const uid = decoded.uid;
-  const email = decoded.email ?? '';
-  const displayName = decoded.name ?? 'Member';
-
-  let profile = await getUserProfile(uid);
+  const profile = await getUserProfile(decoded.uid);
   if (!profile) {
-    profile = await upsertUserProfile({
-      uid,
-      email,
-      displayName,
-    });
+    return null;
   }
 
   return {

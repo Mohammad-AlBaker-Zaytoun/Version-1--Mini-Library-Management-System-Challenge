@@ -1,189 +1,130 @@
-import { FieldValue } from 'firebase-admin/firestore';
-
-import { badRequest, forbidden, notFound } from '@/lib/api/errors';
-import { canActOnMember } from '@/lib/auth/permissions';
+﻿import { addDaysIso, nowIso } from '@/lib/utils';
 import { getAdminDb } from '@/lib/firebase/admin';
-import type { CheckinInput, CheckoutInput, CirculationHistoryQueryInput } from '@/lib/schemas/circulation';
-import { paginate } from '@/lib/services/search';
-import { getUserProfile } from '@/lib/services/users';
-import type {
-  ApiUserContext,
-  Book,
-  CirculationHistoryResponse,
-  CirculationMutationResponse,
-  CirculationTransaction,
-  UserProfile,
-} from '@/lib/types';
+import { badRequest, notFound } from '@/lib/api/errors';
+import { FieldValue } from 'firebase-admin/firestore';
+import type { ApiUserContext, Book, CirculationTransaction, Role, UserProfile } from '@/lib/types';
 
 const BOOKS_COLLECTION = 'books';
+const USERS_COLLECTION = 'users';
 const TRANSACTIONS_COLLECTION = 'circulationTransactions';
-const DEFAULT_DUE_DAYS = 14;
 
-function resolveDueDate(input: CheckoutInput, now: Date): string {
-  if (input.dueDate) {
-    const parsed = new Date(input.dueDate);
-    if (Number.isNaN(parsed.getTime())) {
-      badRequest('Invalid dueDate value');
-    }
-
-    if (parsed.getTime() <= now.getTime()) {
-      badRequest('dueDate must be in the future');
-    }
-
-    return parsed.toISOString();
-  }
-
-  const dueDays = input.dueDays ?? DEFAULT_DUE_DAYS;
-  const dueDate = new Date(now);
-  dueDate.setDate(dueDate.getDate() + dueDays);
-  return dueDate.toISOString();
+function getActorName(user: ApiUserContext): string {
+  return user.displayName || user.email || 'Unknown user';
 }
 
-async function resolveTargetMember(memberUid: string | undefined, actor: ApiUserContext): Promise<UserProfile> {
-  const targetUid = memberUid?.trim() || actor.uid;
-
-  if (!canActOnMember(targetUid, actor)) {
-    forbidden('Members can only perform circulation actions for themselves');
-  }
-
-  const memberProfile = await getUserProfile(targetUid);
-  if (!memberProfile) {
-    notFound('Target member profile was not found');
-  }
-
-  return memberProfile;
+function canActOnLoan(targetMemberUid: string, role: Role, actorUid: string): boolean {
+  return role === 'admin' || actorUid === targetMemberUid;
 }
 
-function sortTransactionsByNewest(items: CirculationTransaction[]): CirculationTransaction[] {
-  return [...items].sort((first, second) => second.createdAt.localeCompare(first.createdAt));
-}
+export async function checkoutBook(params: {
+  bookId: string;
+  memberUid: string;
+  loanDays: number;
+  actor: ApiUserContext;
+}): Promise<{ book: Book; transaction: CirculationTransaction }> {
+  const now = nowIso();
+  const dueDate = addDaysIso(now, params.loanDays);
+  const actorName = getActorName(params.actor);
 
-export async function checkoutBook(
-  input: CheckoutInput,
-  actor: ApiUserContext,
-): Promise<CirculationMutationResponse> {
-  const memberProfile = await resolveTargetMember(input.memberUid, actor);
-  const nowDate = new Date();
-  const now = nowDate.toISOString();
-  const dueDate = resolveDueDate(input, nowDate);
+  if (!canActOnLoan(params.memberUid, params.actor.role, params.actor.uid)) {
+    badRequest('Members can only checkout books for themselves');
+  }
 
-  const db = getAdminDb();
-  const bookRef = db.collection(BOOKS_COLLECTION).doc(input.bookId);
-  const transactionRef = db.collection(TRANSACTIONS_COLLECTION).doc();
+  const bookRef = getAdminDb().collection(BOOKS_COLLECTION).doc(params.bookId);
+  const memberRef = getAdminDb().collection(USERS_COLLECTION).doc(params.memberUid);
+  const txRef = getAdminDb().collection(TRANSACTIONS_COLLECTION).doc();
 
-  let updatedBook: Book | null = null;
-  let transactionEntry: CirculationTransaction | null = null;
+  return getAdminDb().runTransaction(async (transaction) => {
+    const [bookSnapshot, memberSnapshot] = await Promise.all([
+      transaction.get(bookRef),
+      transaction.get(memberRef),
+    ]);
 
-  await db.runTransaction(async (transaction) => {
-    const bookSnapshot = await transaction.get(bookRef);
     if (!bookSnapshot.exists) {
       notFound('Book not found');
     }
 
-    const currentBook = bookSnapshot.data() as Book;
-    if (currentBook.availability === 'checked_out') {
+    if (!memberSnapshot.exists) {
+      notFound('Member profile not found');
+    }
+
+    const book = bookSnapshot.data() as Book;
+    const member = memberSnapshot.data() as UserProfile;
+
+    if (book.availability === 'checked_out') {
       badRequest('Book is already checked out');
     }
 
-    updatedBook = {
-      ...currentBook,
+    const updatedBook: Book = {
+      ...book,
       availability: 'checked_out',
-      borrowedByUid: memberProfile.uid,
-      borrowedByName: memberProfile.displayName,
+      borrowedByUid: member.uid,
+      borrowedByName: member.displayName,
       borrowedAt: now,
       dueDate,
       updatedAt: now,
-      updatedByUid: actor.uid,
+      updatedByUid: params.actor.uid,
     };
 
-    transaction.update(bookRef, {
-      availability: 'checked_out',
-      borrowedByUid: memberProfile.uid,
-      borrowedByName: memberProfile.displayName,
-      borrowedAt: now,
-      dueDate,
-      updatedAt: now,
-      updatedByUid: actor.uid,
-    });
-
-    const createdTransaction: CirculationTransaction = {
-      id: transactionRef.id,
-      bookId: currentBook.id,
-      bookTitle: currentBook.title,
+    const ledgerEntry: CirculationTransaction = {
+      id: txRef.id,
+      bookId: book.id,
+      bookTitle: book.title,
       action: 'checkout',
-      memberUid: memberProfile.uid,
-      memberName: memberProfile.displayName,
-      actorUid: actor.uid,
-      actorName: actor.displayName,
+      memberUid: member.uid,
+      memberName: member.displayName,
+      actorUid: params.actor.uid,
+      actorName,
       dueDate,
       createdAt: now,
     };
 
-    transactionEntry = createdTransaction;
-    transaction.set(transactionRef, createdTransaction);
+    transaction.set(bookRef, updatedBook, { merge: true });
+    transaction.set(txRef, ledgerEntry);
+
+    return {
+      book: updatedBook,
+      transaction: ledgerEntry,
+    };
   });
-
-  if (!updatedBook || !transactionEntry) {
-    throw new Error('Failed to create checkout transaction');
-  }
-
-  return {
-    book: updatedBook,
-    transaction: transactionEntry,
-  };
 }
 
-export async function checkinBook(
-  input: CheckinInput,
-  actor: ApiUserContext,
-): Promise<CirculationMutationResponse> {
-  if (input.memberUid && !canActOnMember(input.memberUid, actor)) {
-    forbidden('Members can only perform circulation actions for themselves');
-  }
+export async function checkinBook(params: {
+  bookId: string;
+  actor: ApiUserContext;
+}): Promise<{ book: Book; transaction: CirculationTransaction }> {
+  const now = nowIso();
+  const actorName = getActorName(params.actor);
+  const bookRef = getAdminDb().collection(BOOKS_COLLECTION).doc(params.bookId);
+  const txRef = getAdminDb().collection(TRANSACTIONS_COLLECTION).doc();
 
-  const now = new Date().toISOString();
-  const db = getAdminDb();
-  const bookRef = db.collection(BOOKS_COLLECTION).doc(input.bookId);
-  const transactionRef = db.collection(TRANSACTIONS_COLLECTION).doc();
-
-  let updatedBook: Book | null = null;
-  let transactionEntry: CirculationTransaction | null = null;
-
-  await db.runTransaction(async (transaction) => {
+  return getAdminDb().runTransaction(async (transaction) => {
     const bookSnapshot = await transaction.get(bookRef);
+
     if (!bookSnapshot.exists) {
       notFound('Book not found');
     }
 
-    const currentBook = bookSnapshot.data() as Book;
-    if (currentBook.availability === 'available') {
-      badRequest('Book is already checked in');
+    const book = bookSnapshot.data() as Book;
+
+    if (book.availability !== 'checked_out' || !book.borrowedByUid || !book.borrowedByName) {
+      badRequest('Book is not currently checked out');
     }
 
-    const borrowerUid = currentBook.borrowedByUid;
-    const borrowerName = currentBook.borrowedByName;
-
-    if (!borrowerUid || !borrowerName) {
-      badRequest('Current borrower information is missing for this book');
+    if (!canActOnLoan(book.borrowedByUid, params.actor.role, params.actor.uid)) {
+      badRequest('Members can only check in their own loans');
     }
 
-    if (!canActOnMember(borrowerUid, actor)) {
-      forbidden('Members can only check in books they borrowed');
-    }
-
-    if (actor.role === 'admin' && input.memberUid && input.memberUid !== borrowerUid) {
-      badRequest('Provided memberUid does not match current borrower');
-    }
-
-    updatedBook = {
-      ...currentBook,
-      availability: 'available',
-      borrowedByUid: undefined,
-      borrowedByName: undefined,
-      borrowedAt: undefined,
-      dueDate: undefined,
-      updatedAt: now,
-      updatedByUid: actor.uid,
+    const ledgerEntry: CirculationTransaction = {
+      id: txRef.id,
+      bookId: book.id,
+      bookTitle: book.title,
+      action: 'checkin',
+      memberUid: book.borrowedByUid,
+      memberName: book.borrowedByName,
+      actorUid: params.actor.uid,
+      actorName,
+      createdAt: now,
     };
 
     transaction.update(bookRef, {
@@ -193,72 +134,44 @@ export async function checkinBook(
       borrowedAt: FieldValue.delete(),
       dueDate: FieldValue.delete(),
       updatedAt: now,
-      updatedByUid: actor.uid,
+      updatedByUid: params.actor.uid,
     });
+    transaction.set(txRef, ledgerEntry);
 
-    const createdTransaction: CirculationTransaction = {
-      id: transactionRef.id,
-      bookId: currentBook.id,
-      bookTitle: currentBook.title,
-      action: 'checkin',
-      memberUid: borrowerUid,
-      memberName: borrowerName,
-      actorUid: actor.uid,
-      actorName: actor.displayName,
-      createdAt: now,
+    const updatedBook: Book = {
+      ...book,
+      availability: 'available',
+      updatedAt: now,
+      updatedByUid: params.actor.uid,
     };
 
-    transactionEntry = createdTransaction;
-    transaction.set(transactionRef, createdTransaction);
+    delete updatedBook.borrowedByUid;
+    delete updatedBook.borrowedByName;
+    delete updatedBook.borrowedAt;
+    delete updatedBook.dueDate;
+
+    return {
+      book: updatedBook,
+      transaction: ledgerEntry,
+    };
   });
-
-  if (!updatedBook || !transactionEntry) {
-    throw new Error('Failed to create checkin transaction');
-  }
-
-  return {
-    book: updatedBook,
-    transaction: transactionEntry,
-  };
 }
 
-export async function getCirculationHistory(
-  query: CirculationHistoryQueryInput,
-  actor: ApiUserContext,
-): Promise<CirculationHistoryResponse> {
-  const db = getAdminDb();
-  const transactionsCollection = db.collection(TRANSACTIONS_COLLECTION);
+export async function listTransactions(params: {
+  user: ApiUserContext;
+  limit?: number;
+}): Promise<CirculationTransaction[]> {
+  const snapshot = await getAdminDb()
+    .collection(TRANSACTIONS_COLLECTION)
+    .orderBy('createdAt', 'desc')
+    .limit(params.limit ?? 200)
+    .get();
 
-  let transactions: CirculationTransaction[];
-  if (actor.role === 'admin') {
-    const snapshot = await transactionsCollection.orderBy('createdAt', 'desc').limit(1000).get();
-    transactions = snapshot.docs.map((doc) => doc.data() as CirculationTransaction);
+  const allEntries = snapshot.docs.map((doc) => doc.data() as CirculationTransaction);
 
-    if (query.memberUid) {
-      transactions = transactions.filter((entry) => entry.memberUid === query.memberUid);
-    }
-  } else {
-    const snapshot = await transactionsCollection.where('memberUid', '==', actor.uid).limit(1000).get();
-    transactions = sortTransactionsByNewest(
-      snapshot.docs.map((doc) => doc.data() as CirculationTransaction),
-    );
+  if (params.user.role === 'admin') {
+    return allEntries;
   }
 
-  if (query.action) {
-    transactions = transactions.filter((entry) => entry.action === query.action);
-  }
-
-  if (query.bookId) {
-    transactions = transactions.filter((entry) => entry.bookId === query.bookId);
-  }
-
-  const paginated = paginate(transactions, query.page, query.limit);
-
-  return {
-    items: paginated.slicedItems,
-    page: paginated.page,
-    limit: query.limit,
-    total: paginated.total,
-    totalPages: paginated.totalPages,
-  };
+  return allEntries.filter((entry) => entry.memberUid === params.user.uid);
 }

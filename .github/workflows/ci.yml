@@ -2,25 +2,25 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
   push:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   quality:
     runs-on: ubuntu-latest
     env:
       NEXT_PUBLIC_APP_URL: http://localhost:3000
-      NEXT_PUBLIC_FIREBASE_API_KEY: ci-api-key
-      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ci-project.firebaseapp.com
-      NEXT_PUBLIC_FIREBASE_PROJECT_ID: ci-project
-      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ci-project.appspot.com
-      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "1234567890"
-      NEXT_PUBLIC_FIREBASE_APP_ID: 1:1234567890:web:ci
-      FIREBASE_PROJECT_ID: ci-project
-      FIREBASE_CLIENT_EMAIL: firebase-adminsdk@ci-project.iam.gserviceaccount.com
-      FIREBASE_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----\\nCI_TEST_KEY\\n-----END PRIVATE KEY-----\\n"
-      GEMINI_API_KEY: ci-gemini-key
+      NEXT_PUBLIC_FIREBASE_API_KEY: test_key
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: test-project.firebaseapp.com
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: test-project
+      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: test-project.appspot.com
+      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '1234567890'
+      NEXT_PUBLIC_FIREBASE_APP_ID: 1:1234567890:web:testappid
+      FIREBASE_PROJECT_ID: test-project
+      FIREBASE_CLIENT_EMAIL: firebase-adminsdk@test-project.iam.gserviceaccount.com
+      FIREBASE_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----\\nabc\\n-----END PRIVATE KEY-----\\n"
+      GEMINI_API_KEY: test_gemini_key
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -45,7 +45,7 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Test
+      - name: Unit and integration tests
         run: pnpm test
 
       - name: Build

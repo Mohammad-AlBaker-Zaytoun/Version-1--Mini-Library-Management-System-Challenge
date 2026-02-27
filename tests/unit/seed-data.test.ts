@@ -1,80 +1,86 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildSeedDataset } from '../../scripts/seed-data';
-
-const REFERENCE_NOW = new Date('2026-02-27T12:00:00.000Z');
+import { buildSeedDataset, SEED_USER_IDS } from '@/scripts/seed-data';
 
 describe('seed dataset integrity', () => {
-  it('matches expected profile sizes and deterministic IDs', () => {
-    const dataset = buildSeedDataset(REFERENCE_NOW);
+  const referenceNow = new Date('2026-02-20T12:00:00.000Z');
+  const dataset = buildSeedDataset(referenceNow);
 
+  it('produces exact deterministic dataset sizes and ids', () => {
     expect(dataset.users).toHaveLength(4);
     expect(dataset.books).toHaveLength(30);
-    expect(dataset.circulationTransactions).toHaveLength(40);
+    expect(dataset.transactions).toHaveLength(40);
 
-    expect(dataset.users.map((user) => user.uid)).toEqual([
-      'seed-admin-001',
-      'seed-member-001',
-      'seed-member-002',
-      'seed-member-003',
+    expect(dataset.users.map((entry) => entry.id)).toEqual([
+      SEED_USER_IDS.admin,
+      SEED_USER_IDS.member1,
+      SEED_USER_IDS.member2,
+      SEED_USER_IDS.member3,
     ]);
+
     expect(dataset.books[0]?.id).toBe('book-001');
     expect(dataset.books[29]?.id).toBe('book-030');
-    expect(dataset.circulationTransactions[0]?.id).toBe('tx-001');
-    expect(dataset.circulationTransactions[39]?.id).toBe('tx-040');
+    expect(dataset.transactions[0]?.id).toBe('tx-001');
+    expect(dataset.transactions[39]?.id).toBe('tx-040');
   });
 
-  it('contains no dangling references', () => {
-    const dataset = buildSeedDataset(REFERENCE_NOW);
-    const userIds = new Set(dataset.users.map((user) => user.uid));
-    const bookIds = new Set(dataset.books.map((book) => book.id));
+  it('has no dangling references in transactions', () => {
+    const userIds = new Set(dataset.users.map((entry) => entry.id));
+    const bookIds = new Set(dataset.books.map((entry) => entry.id));
 
-    for (const transaction of dataset.circulationTransactions) {
-      expect(bookIds.has(transaction.bookId)).toBe(true);
-      expect(userIds.has(transaction.memberUid)).toBe(true);
-      expect(userIds.has(transaction.actorUid)).toBe(true);
+    for (const entry of dataset.transactions) {
+      expect(bookIds.has(entry.data.bookId)).toBe(true);
+      expect(userIds.has(entry.data.memberUid)).toBe(true);
+      expect(userIds.has(entry.data.actorUid)).toBe(true);
     }
   });
 
-  it('keeps final availability consistent with latest transaction', () => {
-    const dataset = buildSeedDataset(REFERENCE_NOW);
-    const transactionsByBook = new Map<string, typeof dataset.circulationTransactions>();
-
-    for (const transaction of dataset.circulationTransactions) {
-      const list = transactionsByBook.get(transaction.bookId) ?? [];
-      list.push(transaction);
-      transactionsByBook.set(transaction.bookId, list);
-    }
-
-    for (const book of dataset.books) {
-      const history = [...(transactionsByBook.get(book.id) ?? [])].sort((first, second) =>
-        first.createdAt.localeCompare(second.createdAt),
-      );
-      const lastTransaction = history.at(-1);
-
-      if (book.availability === 'checked_out') {
-        expect(lastTransaction?.action).toBe('checkout');
-        expect(book.borrowedByUid).toBeTruthy();
-        expect(book.borrowedByName).toBeTruthy();
-        expect(book.borrowedAt).toBeTruthy();
-        expect(book.dueDate).toBeTruthy();
-      } else if (lastTransaction) {
-        expect(lastTransaction.action).toBe('checkin');
+  it('maintains consistent final availability with latest transaction action', () => {
+    const latestActionByBook = new Map<
+      string,
+      { action: 'checkout' | 'checkin'; createdAt: string }
+    >();
+    for (const txEntry of dataset.transactions) {
+      const current = latestActionByBook.get(txEntry.data.bookId);
+      if (!current || txEntry.data.createdAt > current.createdAt) {
+        latestActionByBook.set(txEntry.data.bookId, {
+          action: txEntry.data.action,
+          createdAt: txEntry.data.createdAt,
+        });
       }
     }
 
-    const checkedOut = dataset.books.filter((book) => book.availability === 'checked_out');
-    const available = dataset.books.filter((book) => book.availability === 'available');
-    const overdue = checkedOut.filter((book) => {
-      if (!book.dueDate) {
-        return false;
+    for (const bookEntry of dataset.books) {
+      const latestAction = latestActionByBook.get(bookEntry.id);
+      if (bookEntry.data.availability === 'checked_out') {
+        expect(latestAction?.action).toBe('checkout');
+        expect(bookEntry.data.borrowedByUid).toBeTruthy();
+        expect(bookEntry.data.borrowedByName).toBeTruthy();
+        expect(bookEntry.data.borrowedAt).toBeTruthy();
+        expect(bookEntry.data.dueDate).toBeTruthy();
+      } else if (latestAction) {
+        expect(latestAction.action).toBe('checkin');
       }
+    }
+  });
 
-      return new Date(book.dueDate).getTime() < REFERENCE_NOW.getTime();
-    });
+  it('contains 12 checked-out books with 5 overdue and 7 active loans', () => {
+    const checkedOutBooks = dataset.books.filter(
+      (book) => book.data.availability === 'checked_out',
+    );
+    expect(checkedOutBooks).toHaveLength(12);
 
-    expect(checkedOut).toHaveLength(12);
-    expect(available).toHaveLength(18);
-    expect(overdue).toHaveLength(5);
+    const nowTime = referenceNow.getTime();
+    const overdueCount = checkedOutBooks.filter((book) => {
+      const dueDate = book.data.dueDate;
+      return dueDate ? new Date(dueDate).getTime() < nowTime : false;
+    }).length;
+    const activeCount = checkedOutBooks.filter((book) => {
+      const dueDate = book.data.dueDate;
+      return dueDate ? new Date(dueDate).getTime() > nowTime : false;
+    }).length;
+
+    expect(overdueCount).toBe(5);
+    expect(activeCount).toBe(7);
   });
 });

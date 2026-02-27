@@ -2,30 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { handleApiError } from '@/lib/api/errors';
 import { requireApiUser } from '@/lib/auth/api-auth';
-import { circulationHistoryQuerySchema } from '@/lib/schemas/circulation';
-import { getCirculationHistory } from '@/lib/services/circulation';
+import { listTransactions } from '@/lib/services/circulation';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
-    const actor = await requireApiUser(request);
+    const user = await requireApiUser(request);
+    const limit = Number(request.nextUrl.searchParams.get('limit') ?? '200');
 
-    const parsedQuery = circulationHistoryQuerySchema.safeParse({
-      action: request.nextUrl.searchParams.get('action') ?? undefined,
-      memberUid: request.nextUrl.searchParams.get('memberUid') ?? undefined,
-      bookId: request.nextUrl.searchParams.get('bookId') ?? undefined,
-      page: request.nextUrl.searchParams.get('page') ?? undefined,
-      limit: request.nextUrl.searchParams.get('limit') ?? undefined,
+    const entries = await listTransactions({
+      user,
+      limit: Number.isNaN(limit) ? 200 : Math.min(Math.max(limit, 1), 500),
     });
 
-    if (!parsedQuery.success) {
-      return NextResponse.json(
-        { error: parsedQuery.error.issues[0]?.message ?? 'Invalid query' },
-        { status: 400 },
-      );
-    }
-
-    const result = await getCirculationHistory(parsedQuery.data, actor);
-    return NextResponse.json(result);
+    return NextResponse.json({ items: entries });
   } catch (error) {
     return handleApiError(error);
   }

@@ -1,137 +1,56 @@
-import { getAdminDb } from '@/lib/firebase/admin';
-import type { AnalyticsOverviewQueryInput } from '@/lib/schemas/analytics';
+﻿import { getAdminDb } from '@/lib/firebase/admin';
 import type { AnalyticsOverview, ApiUserContext, Book, CirculationTransaction } from '@/lib/types';
 
 const BOOKS_COLLECTION = 'books';
 const TRANSACTIONS_COLLECTION = 'circulationTransactions';
 
-interface MonthBucket {
-  key: string;
-  label: string;
-}
+export async function getAnalyticsOverview(user: ApiUserContext): Promise<AnalyticsOverview> {
+  const [booksSnapshot, txSnapshot] = await Promise.all([
+    getAdminDb().collection(BOOKS_COLLECTION).get(),
+    getAdminDb().collection(TRANSACTIONS_COLLECTION).orderBy('createdAt', 'desc').limit(500).get(),
+  ]);
 
-function toMonthKey(date: Date): string {
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
-}
+  const books = booksSnapshot.docs.map((doc) => doc.data() as Book);
+  const transactions = txSnapshot.docs.map((doc) => doc.data() as CirculationTransaction);
 
-function createMonthBuckets(rangeMonths: number, now: Date): MonthBucket[] {
-  return Array.from({ length: rangeMonths }, (_, index) => {
-    const monthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (rangeMonths - 1 - index), 1));
-    return {
-      key: toMonthKey(monthDate),
-      label: new Intl.DateTimeFormat('en-US', {
-        month: 'short',
-        year: '2-digit',
-      }).format(monthDate),
-    };
-  });
-}
+  const scopedBooks =
+    user.role === 'admin'
+      ? books
+      : books.filter((book) => book.borrowedByUid === user.uid || book.createdByUid === user.uid);
+  const scopedTransactions =
+    user.role === 'admin'
+      ? transactions
+      : transactions.filter((transaction) => transaction.memberUid === user.uid);
 
-function isBookOverdue(book: Book, nowMs: number): boolean {
-  if (book.availability !== 'checked_out' || !book.dueDate) {
-    return false;
-  }
+  const now = Date.now();
 
-  const dueMs = new Date(book.dueDate).getTime();
-  if (Number.isNaN(dueMs)) {
-    return false;
-  }
+  const activeLoans = scopedBooks.filter((book) => book.availability === 'checked_out').length;
+  const overdueCount = scopedBooks.filter((book) => {
+    if (book.availability !== 'checked_out' || !book.dueDate) {
+      return false;
+    }
 
-  return dueMs < nowMs;
-}
+    return new Date(book.dueDate).getTime() < now;
+  }).length;
 
-function computeSeries(
-  transactions: CirculationTransaction[],
-  buckets: MonthBucket[],
-): Pick<AnalyticsOverview, 'monthlyCheckouts' | 'monthlyCheckins'> {
-  const checkoutMap = new Map<string, number>(buckets.map((bucket) => [bucket.key, 0]));
-  const checkinMap = new Map<string, number>(buckets.map((bucket) => [bucket.key, 0]));
-
-  for (const transaction of transactions) {
-    const createdAt = new Date(transaction.createdAt);
-    if (Number.isNaN(createdAt.getTime())) {
+  const monthlyBuckets = new Map<string, number>();
+  for (const entry of scopedTransactions) {
+    if (entry.action !== 'checkout') {
       continue;
     }
 
-    const key = toMonthKey(createdAt);
-    if (!checkoutMap.has(key)) {
-      continue;
-    }
-
-    if (transaction.action === 'checkout') {
-      checkoutMap.set(key, (checkoutMap.get(key) ?? 0) + 1);
-      continue;
-    }
-
-    checkinMap.set(key, (checkinMap.get(key) ?? 0) + 1);
+    const month = entry.createdAt.slice(0, 7);
+    monthlyBuckets.set(month, (monthlyBuckets.get(month) ?? 0) + 1);
   }
+
+  const monthlyCheckouts = Array.from(monthlyBuckets.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, count]) => ({ month, count }));
 
   return {
-    monthlyCheckouts: buckets.map((bucket) => ({
-      month: bucket.label,
-      count: checkoutMap.get(bucket.key) ?? 0,
-    })),
-    monthlyCheckins: buckets.map((bucket) => ({
-      month: bucket.label,
-      count: checkinMap.get(bucket.key) ?? 0,
-    })),
-  };
-}
-
-function roundPercent(value: number): number {
-  return Math.max(0, Math.min(100, Math.round(value)));
-}
-
-export async function getAnalyticsOverview(
-  actor: ApiUserContext,
-  query: AnalyticsOverviewQueryInput,
-): Promise<AnalyticsOverview> {
-  const db = getAdminDb();
-  const now = new Date();
-  const nowMs = now.getTime();
-  const buckets = createMonthBuckets(query.rangeMonths, now);
-
-  const booksSnapshot = await db.collection(BOOKS_COLLECTION).limit(2500).get();
-  const books = booksSnapshot.docs.map((document) => document.data() as Book);
-
-  const totalBooks = books.length;
-  const activeLoansGlobal = books.filter((book) => book.availability === 'checked_out').length;
-  const availableBooks = books.filter((book) => book.availability === 'available').length;
-  const overdueGlobal = books.filter((book) => isBookOverdue(book, nowMs)).length;
-
-  const myActiveLoans = books.filter(
-    (book) => book.availability === 'checked_out' && book.borrowedByUid === actor.uid,
-  ).length;
-  const myOverdueLoans = books.filter(
-    (book) => book.borrowedByUid === actor.uid && isBookOverdue(book, nowMs),
-  ).length;
-
-  const transactionsSnapshot =
-    actor.role === 'admin'
-      ? await db.collection(TRANSACTIONS_COLLECTION).orderBy('createdAt', 'desc').limit(5000).get()
-      : await db.collection(TRANSACTIONS_COLLECTION).where('memberUid', '==', actor.uid).limit(5000).get();
-
-  const transactions = transactionsSnapshot.docs
-    .map((document) => document.data() as CirculationTransaction)
-    .sort((first, second) => second.createdAt.localeCompare(first.createdAt));
-  const { monthlyCheckouts, monthlyCheckins } = computeSeries(transactions, buckets);
-
-  const scope: AnalyticsOverview['scope'] = actor.role === 'admin' ? 'admin' : 'member';
-  const scopedActiveLoans = scope === 'admin' ? activeLoansGlobal : myActiveLoans;
-  const scopedOverdue = scope === 'admin' ? overdueGlobal : myOverdueLoans;
-  const utilizationBase = scope === 'admin' ? activeLoansGlobal : myActiveLoans;
-  const utilizationRate = totalBooks > 0 ? roundPercent((utilizationBase / totalBooks) * 100) : 0;
-
-  return {
-    scope,
-    totalBooks,
-    availableBooks,
-    activeLoans: scopedActiveLoans,
-    overdueCount: scopedOverdue,
-    myActiveLoans,
-    myOverdueLoans,
-    utilizationRate,
+    activeLoans,
+    overdueCount,
+    totalBooks: scopedBooks.length,
     monthlyCheckouts,
-    monthlyCheckins,
   };
 }

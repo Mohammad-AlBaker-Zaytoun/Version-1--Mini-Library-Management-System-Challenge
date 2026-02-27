@@ -1,149 +1,87 @@
 'use client';
 
-import { Search, SlidersHorizontal, X } from 'lucide-react';
+import { Search } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import type { BookAvailability } from '@/lib/types';
+import { Button } from '@/components/ui/button';
 
-export type AvailabilityFilter = '' | BookAvailability;
-
-export interface CatalogFilterValues {
+interface BookSearchFiltersProps {
   q: string;
   author: string;
   genre: string;
-  tags: string;
-  availability: AvailabilityFilter;
-  overdueOnly: boolean;
+  availability: 'all' | 'available' | 'checked_out';
+  loading?: boolean;
+  disabled?: boolean;
+  onChange: (next: {
+    q: string;
+    author: string;
+    genre: string;
+    availability: 'all' | 'available' | 'checked_out';
+  }) => void;
+  onApply: () => void;
 }
 
-export function CatalogSearchFilters({
-  filters,
-  total,
-  hasFilters,
-  busyBookId,
-  isRefreshing,
-  onUpdate,
-  onReset,
-}: {
-  filters: CatalogFilterValues;
-  total: number;
-  hasFilters: boolean;
-  busyBookId: string | null;
-  isRefreshing: boolean;
-  onUpdate: (next: Partial<CatalogFilterValues>) => void;
-  onReset: () => void;
-}) {
+export function BookSearchFilters({
+  q,
+  author,
+  genre,
+  availability,
+  loading = false,
+  disabled = false,
+  onChange,
+  onApply,
+}: BookSearchFiltersProps) {
   return (
-    <Card className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
-            <Search className="h-4 w-4 text-[var(--brand-primary)]" />
-            Find in catalog
-          </p>
-          <p className="mt-1 text-xs text-[var(--text-secondary)]">
-            Filters sync with URL so results can be shared and revisited.
-          </p>
-        </div>
-        <Badge variant="muted">
-          {busyBookId
-            ? 'Updating loan'
-            : isRefreshing
-              ? 'Refreshing'
-              : `${total} result${total === 1 ? '' : 's'}`}
-        </Badge>
+    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4 shadow-[var(--shadow-soft)] transition-[transform,box-shadow] duration-[560ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-safe:hover:-translate-y-0.5 motion-safe:hover:shadow-[0_20px_40px_-28px_rgba(20,35,115,0.45)]">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Input
+          value={q}
+          onChange={(event) => onChange({ q: event.target.value, author, genre, availability })}
+          placeholder="Search title, author, tags"
+          disabled={disabled}
+        />
+        <Input
+          value={author}
+          onChange={(event) => onChange({ q, author: event.target.value, genre, availability })}
+          placeholder="Author"
+          disabled={disabled}
+        />
+        <Input
+          value={genre}
+          onChange={(event) => onChange({ q, author, genre: event.target.value, availability })}
+          placeholder="Genre"
+          disabled={disabled}
+        />
+        <select
+          value={availability}
+          onChange={(event) =>
+            onChange({
+              q,
+              author,
+              genre,
+              availability: event.target.value as 'all' | 'available' | 'checked_out',
+            })
+          }
+          disabled={disabled}
+          className="h-10 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 text-sm text-[var(--text-primary)] transition-[border-color,box-shadow,background-color] duration-[420ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-[#b9c7ff] hover:shadow-[0_10px_20px_-16px_rgba(36,70,232,0.85)] focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="all">All statuses</option>
+          <option value="available">Available</option>
+          <option value="checked_out">Checked out</option>
+        </select>
       </div>
-
-      <form className="space-y-3" onSubmit={(event) => event.preventDefault()}>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="space-y-1">
-            <Label htmlFor="catalog-q">Search</Label>
-            <Input
-              id="catalog-q"
-              placeholder="Title, author, genre, tags..."
-              value={filters.q}
-              onChange={(event) => onUpdate({ q: event.target.value })}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="catalog-author">Author</Label>
-            <Input
-              id="catalog-author"
-              placeholder="e.g. Toni Morrison"
-              value={filters.author}
-              onChange={(event) => onUpdate({ author: event.target.value })}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="catalog-genre">Genre</Label>
-            <Input
-              id="catalog-genre"
-              placeholder="e.g. Science Fiction"
-              value={filters.genre}
-              onChange={(event) => onUpdate({ genre: event.target.value })}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="catalog-tags">Tags (comma separated)</Label>
-            <Input
-              id="catalog-tags"
-              placeholder="classic, mystery"
-              value={filters.tags}
-              onChange={(event) => onUpdate({ tags: event.target.value })}
-            />
-          </div>
-          <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor="catalog-availability">Availability</Label>
-            <div className="relative">
-              <SlidersHorizontal className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
-              <select
-                id="catalog-availability"
-                value={filters.availability}
-                onChange={(event) =>
-                  onUpdate({ availability: event.target.value as AvailabilityFilter })
-                }
-                className="flex h-10 w-full appearance-none rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] pr-3 pl-10 text-sm text-[var(--text-primary)] shadow-sm transition-[border-color,box-shadow,background-color] duration-300 ease-[var(--motion-smooth)] hover:border-[#b9c7ff] focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:outline-none"
-              >
-                <option value="">All statuses</option>
-                <option value="available">Available</option>
-                <option value="checked_out">Checked out</option>
-              </select>
-            </div>
-          </div>
-          <div className="sm:col-span-2">
-            <label
-              htmlFor="catalog-overdue-only"
-              className="inline-flex items-center gap-2 text-xs font-medium text-[var(--text-secondary)]"
-            >
-              <input
-                id="catalog-overdue-only"
-                type="checkbox"
-                checked={filters.overdueOnly}
-                onChange={(event) => onUpdate({ overdueOnly: event.target.checked })}
-                className="h-4 w-4 rounded border-[var(--border-subtle)] text-[var(--brand-primary)] focus:ring-[var(--brand-primary)]"
-              />
-              Overdue only
-            </label>
-          </div>
-        </div>
-
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onReset}
-            disabled={!hasFilters || Boolean(busyBookId)}
-            className="sm:min-w-28"
-          >
-            <X className="mr-1 h-4 w-4" />
-            Clear
-          </Button>
-        </div>
-      </form>
-    </Card>
+      <div className="mt-3 flex justify-end">
+        <Button
+          variant="secondary"
+          onClick={onApply}
+          loading={loading}
+          loadingText="Applying filters"
+          disabled={disabled}
+        >
+          <Search className="mr-2 h-4 w-4" />
+          Apply filters
+        </Button>
+      </div>
+    </div>
   );
 }

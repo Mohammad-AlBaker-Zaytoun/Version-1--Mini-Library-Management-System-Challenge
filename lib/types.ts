@@ -51,19 +51,6 @@ export interface CirculationTransaction {
   createdAt: string;
 }
 
-export interface CirculationMutationResponse {
-  book: Book;
-  transaction: CirculationTransaction;
-}
-
-export interface CirculationHistoryResponse {
-  items: CirculationTransaction[];
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-}
-
 export interface ApiUserContext {
   uid: string;
   email: string;
@@ -80,16 +67,10 @@ export interface BooksListResponse {
 }
 
 export interface AnalyticsOverview {
-  scope: 'admin' | 'member';
   activeLoans: number;
   overdueCount: number;
   totalBooks: number;
-  availableBooks: number;
-  myActiveLoans: number;
-  myOverdueLoans: number;
-  utilizationRate: number;
   monthlyCheckouts: Array<{ month: string; count: number }>;
-  monthlyCheckins: Array<{ month: string; count: number }>;
 }
 
 export interface DashboardAiInsight {
@@ -109,11 +90,4 @@ export interface CatalogAiRecommendation {
     favoriteGenres: string[];
     favoriteTags: string[];
   };
-}
-
-export interface BookAiEnrichmentResponse {
-  aiSummary: string;
-  aiSuggestedGenre: string;
-  tags: string[];
-  source: 'ai' | 'fallback';
 }
