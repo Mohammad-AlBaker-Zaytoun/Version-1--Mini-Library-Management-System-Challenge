@@ -1,38 +1,24 @@
-import type { Firestore } from 'firebase-admin/firestore';
-
-const SAFE_PROJECT_ID_KEYWORDS = ['test', 'dev', 'staging', 'sandbox', 'demo'];
-const DEFAULT_BATCH_SIZE = 450;
-
 export interface SeedCliOptions {
   force: boolean;
   dryRun: boolean;
   adminEmail?: string;
 }
 
-export interface SeedDeleteSummary {
-  circulationTransactions: number;
-  books: number;
-  users: number;
+export interface SeedDocument<T> {
+  id: string;
+  data: T;
 }
 
-export interface SeedInsertSummary {
-  circulationTransactions: number;
-  books: number;
-  users: number;
-}
+const SAFE_PROJECT_TOKEN_REGEX = /(test|dev|staging|sandbox|demo)/i;
 
-function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-export function parseSeedArgs(argv: string[]): SeedCliOptions {
+export function parseSeedArgs(args: string[]): SeedCliOptions {
   const options: SeedCliOptions = {
     force: false,
     dryRun: false,
   };
 
-  for (const rawArg of argv) {
-    const arg = rawArg.trim();
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
 
     if (arg === '--force') {
       options.force = true;
@@ -45,16 +31,21 @@ export function parseSeedArgs(argv: string[]): SeedCliOptions {
     }
 
     if (arg.startsWith('--admin-email=')) {
-      const email = arg.slice('--admin-email='.length).trim().toLowerCase();
+      const email = arg.slice('--admin-email='.length).trim();
       if (!email) {
-        throw new Error('--admin-email requires a value (example: --admin-email=you@example.com)');
+        throw new Error('Expected a non-empty value for --admin-email');
       }
-
-      if (!isValidEmail(email)) {
-        throw new Error(`Invalid --admin-email value: ${email}`);
-      }
-
       options.adminEmail = email;
+      continue;
+    }
+
+    if (arg === '--admin-email') {
+      const nextArg = args[index + 1];
+      if (!nextArg || nextArg.startsWith('--')) {
+        throw new Error('Expected a value after --admin-email');
+      }
+      options.adminEmail = nextArg.trim();
+      index += 1;
       continue;
     }
 
@@ -64,85 +55,81 @@ export function parseSeedArgs(argv: string[]): SeedCliOptions {
   return options;
 }
 
-export function projectIdLooksSafe(projectId: string): boolean {
-  const normalized = projectId.toLowerCase();
-  return SAFE_PROJECT_ID_KEYWORDS.some((keyword) => normalized.includes(keyword));
+export function isSafeProjectId(projectId: string): boolean {
+  return SAFE_PROJECT_TOKEN_REGEX.test(projectId);
 }
 
-export function assertProjectSafeForReset(projectId: string, force: boolean): void {
-  if (force) {
-    return;
-  }
-
-  if (projectIdLooksSafe(projectId)) {
+export function assertSafeProjectId(projectId: string, force: boolean): void {
+  if (force || isSafeProjectId(projectId)) {
     return;
   }
 
   throw new Error(
-    `Safety guard blocked seeding for project "${projectId}". Use --force if this reset is intentional.`,
+    `Safety guard blocked destructive seed for project "${projectId}". ` +
+      'Use --force only when you intentionally target this project.',
   );
 }
 
-export async function resetCollection(
-  db: Firestore,
-  collectionName: string,
-  dryRun: boolean,
-  batchSize = DEFAULT_BATCH_SIZE,
-): Promise<number> {
-  if (dryRun) {
-    const aggregateSnapshot = await db.collection(collectionName).count().get();
-    return Number(aggregateSnapshot.data().count ?? 0);
-  }
+async function getSeedDb() {
+  const { getAdminDb } = await import('@/lib/firebase/admin');
+  return getAdminDb();
+}
 
-  let deleted = 0;
-  // Firestore does not support direct collection truncate. Delete in repeated batches.
-  for (;;) {
+export async function countCollectionDocuments(collectionName: string): Promise<number> {
+  const db = await getSeedDb();
+  const snapshot = await db.collection(collectionName).get();
+  return snapshot.size;
+}
+
+export async function deleteCollectionInBatches(
+  collectionName: string,
+  batchSize = 450,
+): Promise<number> {
+  const db = await getSeedDb();
+  let deletedCount = 0;
+
+  while (true) {
     const snapshot = await db.collection(collectionName).limit(batchSize).get();
     if (snapshot.empty) {
       break;
     }
 
     const batch = db.batch();
-    for (const document of snapshot.docs) {
-      batch.delete(document.ref);
+    for (const doc of snapshot.docs) {
+      batch.delete(doc.ref);
     }
 
     await batch.commit();
-    deleted += snapshot.size;
+    deletedCount += snapshot.size;
+
+    if (snapshot.size < batchSize) {
+      break;
+    }
   }
 
-  return deleted;
+  return deletedCount;
 }
 
-export async function insertDocuments<T extends { id: string }>(
-  db: Firestore,
+export async function setCollectionDocumentsInBatches<T>(
   collectionName: string,
-  documents: T[],
-  dryRun: boolean,
-  batchSize = DEFAULT_BATCH_SIZE,
+  documents: Array<SeedDocument<T>>,
+  batchSize = 450,
 ): Promise<number> {
-  if (dryRun) {
-    return documents.length;
-  }
+  const db = await getSeedDb();
+  let insertedCount = 0;
 
   for (let index = 0; index < documents.length; index += batchSize) {
-    const chunk = documents.slice(index, index + batchSize);
+    const slice = documents.slice(index, index + batchSize);
     const batch = db.batch();
 
-    for (const document of chunk) {
-      batch.set(db.collection(collectionName).doc(document.id), document);
+    for (const doc of slice) {
+      batch.set(db.collection(collectionName).doc(doc.id), doc.data as DocumentData);
     }
 
     await batch.commit();
+    insertedCount += slice.length;
   }
 
-  return documents.length;
+  return insertedCount;
 }
-
-export function formatDurationMs(durationMs: number): string {
-  if (durationMs < 1000) {
-    return `${durationMs}ms`;
-  }
-
-  return `${(durationMs / 1000).toFixed(2)}s`;
-}
+import type { DocumentData } from 'firebase-admin/firestore';

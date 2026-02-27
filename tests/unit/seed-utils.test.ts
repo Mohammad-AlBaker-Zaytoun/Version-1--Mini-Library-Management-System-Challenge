@@ -1,40 +1,49 @@
 import { describe, expect, it } from 'vitest';
 
-import { assertProjectSafeForReset, parseSeedArgs } from '../../scripts/seed-utils';
+import { assertSafeProjectId, isSafeProjectId, parseSeedArgs } from '@/scripts/seed-utils';
 
-describe('seed CLI arg parsing', () => {
-  it('parses default mode with no flags', () => {
+describe('seed cli args', () => {
+  it('parses default options', () => {
     expect(parseSeedArgs([])).toEqual({
       force: false,
       dryRun: false,
     });
   });
 
-  it('parses force and dry-run flags with admin email', () => {
-    expect(parseSeedArgs(['--force', '--dry-run', '--admin-email=You@Example.com'])).toEqual({
+  it('parses force, dry-run, and admin-email flags', () => {
+    expect(
+      parseSeedArgs(['--force', '--dry-run', '--admin-email=seed.admin@library.demo']),
+    ).toEqual({
       force: true,
       dryRun: true,
-      adminEmail: 'you@example.com',
+      adminEmail: 'seed.admin@library.demo',
+    });
+  });
+
+  it('parses admin-email when value is provided as separate arg', () => {
+    expect(parseSeedArgs(['--admin-email', 'reviewer@example.com'])).toEqual({
+      force: false,
+      dryRun: false,
+      adminEmail: 'reviewer@example.com',
     });
   });
 
   it('throws on unknown flags', () => {
-    expect(() => parseSeedArgs(['--unknown'])).toThrow('Unknown flag: --unknown');
+    expect(() => parseSeedArgs(['--unknown-flag'])).toThrow('Unknown flag');
   });
 });
 
-describe('seed project safety guard', () => {
-  it('passes for test-like project IDs', () => {
-    expect(() => assertProjectSafeForReset('test-proj-eae95', false)).not.toThrow();
+describe('seed safety guard', () => {
+  it('accepts safe project ids by token', () => {
+    expect(isSafeProjectId('test-proj-eae95')).toBe(true);
+    expect(isSafeProjectId('team-dev-library')).toBe(true);
   });
 
-  it('fails for production-like IDs without force', () => {
-    expect(() => assertProjectSafeForReset('prod-library-main', false)).toThrow(
-      'Safety guard blocked seeding',
-    );
+  it('rejects production-like project ids when force is false', () => {
+    expect(() => assertSafeProjectId('prod-library-main', false)).toThrow('Safety guard blocked');
   });
 
-  it('passes for production-like IDs when force is enabled', () => {
-    expect(() => assertProjectSafeForReset('prod-library-main', true)).not.toThrow();
+  it('allows any project when force is true', () => {
+    expect(() => assertSafeProjectId('prod-library-main', true)).not.toThrow();
   });
 });

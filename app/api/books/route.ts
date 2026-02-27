@@ -1,34 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { handleApiError } from '@/lib/api/errors';
-import { parseJsonBody } from '@/lib/api/request';
 import { requireApiUser } from '@/lib/auth/api-auth';
 import { requireRole } from '@/lib/auth/permissions';
 import { booksQuerySchema, bookWriteSchema } from '@/lib/schemas/book';
 import { createBook, searchBooks } from '@/lib/services/books';
+import { parseJsonBody } from '@/lib/api/request';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     await requireApiUser(request);
 
-    const tags =
-      request.nextUrl.searchParams
-        .get('tags')
-        ?.split(',')
-        .map((tag) => tag.trim())
-        .filter(Boolean) ?? [];
-
-    const overdueOnlyParam = request.nextUrl.searchParams.get('overdue');
-    const overdueOnly =
-      overdueOnlyParam === 'true' ? true : overdueOnlyParam === 'false' ? false : undefined;
-
     const parsedQuery = booksQuerySchema.safeParse({
       q: request.nextUrl.searchParams.get('q') ?? undefined,
       author: request.nextUrl.searchParams.get('author') ?? undefined,
       genre: request.nextUrl.searchParams.get('genre') ?? undefined,
-      tags,
       availability: request.nextUrl.searchParams.get('availability') ?? undefined,
-      overdueOnly,
       page: request.nextUrl.searchParams.get('page') ?? undefined,
       limit: request.nextUrl.searchParams.get('limit') ?? undefined,
     });

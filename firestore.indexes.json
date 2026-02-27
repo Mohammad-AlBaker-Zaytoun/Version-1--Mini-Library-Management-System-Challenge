@@ -1,15 +1,15 @@
 {
   "indexes": [
     {
-      "collectionGroup": "books",
+      "collectionGroup": "circulationTransactions",
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "availability",
+          "fieldPath": "memberUid",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "updatedAt",
+          "fieldPath": "createdAt",
           "order": "DESCENDING"
         }
       ]

@@ -13,10 +13,6 @@ interface AiOverviewPanelProps {
   analytics: AnalyticsOverview;
 }
 
-function getErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
-}
-
 export function AiOverviewPanel({ analytics }: AiOverviewPanelProps) {
   const [insight, setInsight] = useState<DashboardAiInsight | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -27,25 +23,12 @@ export function AiOverviewPanel({ analytics }: AiOverviewPanelProps) {
 
   const payload = useMemo(
     () => ({
-      scope: analytics.scope,
       totalBooks: analytics.totalBooks,
-      availableBooks: analytics.availableBooks,
       activeLoans: analytics.activeLoans,
       overdueCount: analytics.overdueCount,
-      utilizationRate: analytics.utilizationRate,
       monthlyCheckouts: analytics.monthlyCheckouts,
-      monthlyCheckins: analytics.monthlyCheckins,
     }),
-    [
-      analytics.activeLoans,
-      analytics.availableBooks,
-      analytics.monthlyCheckins,
-      analytics.monthlyCheckouts,
-      analytics.overdueCount,
-      analytics.scope,
-      analytics.totalBooks,
-      analytics.utilizationRate,
-    ],
+    [analytics.activeLoans, analytics.monthlyCheckouts, analytics.overdueCount, analytics.totalBooks],
   );
   const payloadKey = useMemo(() => JSON.stringify(payload), [payload]);
 
@@ -61,8 +44,8 @@ export function AiOverviewPanel({ analytics }: AiOverviewPanelProps) {
       });
 
       if (!response.ok) {
-        const payloadError = (await response.json()) as { error?: string };
-        throw new Error(payloadError.error ?? 'Failed to generate AI overview');
+        const errorPayload = (await response.json()) as { error?: string };
+        throw new Error(errorPayload.error ?? 'Failed to generate AI overview');
       }
 
       const nextInsight = (await response.json()) as DashboardAiInsight;
@@ -77,7 +60,8 @@ export function AiOverviewPanel({ analytics }: AiOverviewPanelProps) {
         return;
       }
 
-      setError(getErrorMessage(cause, 'Failed to generate AI overview'));
+      const message = cause instanceof Error ? cause.message : 'Failed to generate AI overview';
+      setError(message);
     } finally {
       if (requestId === requestIdRef.current) {
         setIsLoading(false);
@@ -126,7 +110,7 @@ export function AiOverviewPanel({ analytics }: AiOverviewPanelProps) {
       <CardHeader className="mb-0">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
-            <CardTitle className="inline-flex items-center gap-2 text-xl sm:text-2xl">
+            <CardTitle className="inline-flex items-center gap-2">
               <Brain className="h-5 w-5 text-[var(--brand-primary)]" />
               AI Operations Brief
             </CardTitle>
@@ -168,7 +152,7 @@ export function AiOverviewPanel({ analytics }: AiOverviewPanelProps) {
             ) : null}
 
             <div className="rounded-xl border border-[var(--border-subtle)] bg-[linear-gradient(140deg,#f8faff_0%,#eef3ff_70%,#f9f7ff_100%)] px-4 py-3">
-              <p className="inline-flex items-center gap-1 text-xs font-semibold tracking-[0.1em] text-[var(--text-muted)] uppercase">
+              <p className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
                 <Sparkles className="h-3.5 w-3.5" />
                 Overview
               </p>
@@ -179,7 +163,7 @@ export function AiOverviewPanel({ analytics }: AiOverviewPanelProps) {
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3">
-                <p className="text-xs font-semibold tracking-[0.1em] text-[var(--text-muted)] uppercase">
+                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
                   Highlights
                 </p>
                 <ul className="mt-2 space-y-1.5 text-sm text-[var(--text-secondary)]">
@@ -193,7 +177,7 @@ export function AiOverviewPanel({ analytics }: AiOverviewPanelProps) {
               </div>
 
               <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3">
-                <p className="text-xs font-semibold tracking-[0.1em] text-[var(--text-muted)] uppercase">
+                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
                   Recommendations
                 </p>
                 <ul className="mt-2 space-y-1.5 text-sm text-[var(--text-secondary)]">

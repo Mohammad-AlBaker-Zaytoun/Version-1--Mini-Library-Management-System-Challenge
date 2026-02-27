@@ -1,157 +1,401 @@
 # Mini Library Management System (Version 1)
 
-[![CI](https://github.com/Mohammad-AlBaker-Zaytoun/Version-1--Mini-Library-Management-System-Challenge/actions/workflows/ci.yml/badge.svg)](https://github.com/Mohammad-AlBaker-Zaytoun/Version-1--Mini-Library-Management-System-Challenge/actions/workflows/ci.yml)
+Interview-ready, mobile-first library platform built with Next.js App Router, Firebase Auth/Firestore, and Gemini AI.
 
-Interview-focused, incremental implementation of a mobile-first library platform built with Next.js, Firebase, and practical AI features.
+Live URL: `TODO_ADD_VERCEL_URL`
 
-Current status: **PR25 Playwright Alignment**.
+## Table of Contents
 
-## Goals
+- [What This Project Demonstrates](#what-this-project-demonstrates)
+- [Features](#features)
+- [Architecture](#architecture)
+- [Data Model](#data-model)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Prerequisites](#prerequisites)
+- [Firebase Setup](#firebase-setup)
+- [Environment Variables](#environment-variables)
+- [Local Development](#local-development)
+- [Admin Role Bootstrap](#admin-role-bootstrap)
+- [Database Seeding (Deterministic)](#database-seeding-deterministic)
+- [API Reference](#api-reference)
+- [Quality, Testing, and CI](#quality-testing-and-ci)
+- [SEO](#seo)
+- [Deployment (Vercel)](#deployment-vercel)
+- [Branch and PR Strategy](#branch-and-pr-strategy)
+- [Interview Demo Script](#interview-demo-script)
+- [Known Limitations (v1)](#known-limitations-v1)
 
-- Build in small, reviewable PRs.
-- Keep code production-minded from day one.
-- Prioritize responsive UX (mobile-first).
-- Enforce authentication, RBAC, and API validation.
-- Add practical AI features without leaking secrets.
+## What This Project Demonstrates
 
-## Stack
-
-- Next.js App Router + TypeScript strict (no `src/`)
-- Tailwind CSS
-- Firebase Auth (Google SSO) + Firestore
-- Gemini API (server-side usage only)
-- Vercel deployment target
-- pnpm package manager
-
-## Implemented Features
-
-- Authentication and RBAC:
-  - Google SSO login/logout
-  - session cookie sync
-  - protected routes via `proxy.ts`
-  - protected page group layout for authenticated screens
-  - roles: `admin`, `member`
-- Book management:
-  - admin CRUD at `/admin/books`
-  - validation via Zod
-  - audit fields + normalized search metadata
-- Catalog:
-  - search by title/author/genre/tags
-  - availability + overdue filters
-  - URL-synced query state and pagination
-  - checkout/checkin actions with lock/loading states
-  - modular catalog components (`catalog-client`, `search-filters`, `book-grid`)
-- Circulation:
-  - checkout/checkin API workflows
-  - immutable transaction ledger (`circulationTransactions`)
-  - self-only member restrictions with admin overrides
-- Analytics:
-  - `/api/analytics/overview?range=3|6|12`
-  - role-scoped dashboard metrics
-  - overdue pressure, utilization, monthly checkout/checkin charts
-  - modular dashboard components (`analytics-client`, `analytics-cards`, chart modules)
+- Production-style App Router architecture with strict TypeScript.
+- Firebase Google SSO session flow with server-side token verification.
+- Role-based authorization (`admin`, `member`) and route/API guards.
+- Full circulation lifecycle (checkout/checkin) with immutable history.
 - AI features:
-  - admin metadata enrichment endpoint (`POST /api/ai/enrich-book`)
-  - AI summary + genre + tag suggestions in admin book form
-  - strict output validation with fallback response mode
-  - dashboard AI operations brief (`POST /api/dashboard/ai-overview`)
-  - catalog AI next-book recommendation (`POST /api/catalog/ai-recommendation`)
-- SEO baseline:
-  - metadata + OpenGraph/Twitter
-  - canonical routes
-  - `app/sitemap.ts`
-  - `app/robots.ts`
+  - Admin metadata enrichment for book forms.
+  - Dashboard AI operations brief from current analytics.
+  - Catalog AI next-book recommendation personalized from user history.
+- Deterministic Firestore seeding workflow for repeatable demos.
+
+## Features
+
+- Admin CRUD for books (create, edit, delete).
+- Member/admin catalog browsing and search filters.
+- Checkout/checkin with duplicate-checkout prevention.
+- Overdue tracking and analytics dashboard with charts and tooltips.
+- Mobile-first responsive UI and smooth loading/transition states.
+- SEO baseline (`metadata`, canonical tags, `robots.txt`, `sitemap.xml`).
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-  UI[Next.js UI] --> API[Next.js Route Handlers]
-  API --> AUTH[Firebase Admin Auth]
-  API --> DB[(Firestore)]
-  API --> AI[Gemini API]
-  CLIENT[Firebase Client Auth] --> UI
+  A[Client UI<br/>Next.js Pages + Components] --> B[Route Handlers<br/>/api/*]
+  A --> C[Firebase Client Auth<br/>Google SSO]
+  C --> B
+  B --> D[Firebase Admin Auth]
+  B --> E[(Firestore)]
+  B --> F[Gemini API]
 ```
 
-## Core Sequence
+### Auth + Session + Profile Sync
 
 ```mermaid
 sequenceDiagram
-  actor User
-  participant UI as Catalog UI
+  participant U as User Browser
+  participant FC as Firebase Client Auth
   participant API as Next.js API
+  participant FA as Firebase Admin
+  participant FS as Firestore
+
+  U->>FC: Sign in with Google popup
+  FC-->>U: ID token
+  U->>API: POST /api/auth/session
+  API->>FA: verifyIdToken + createSessionCookie
+  API-->>U: httpOnly session cookie
+  U->>API: POST /api/auth/sync
+  API->>FA: verifyIdToken
+  API->>FS: upsert users/{uid}
+  API-->>U: profile (role + identity)
+```
+
+### Circulation Lifecycle
+
+```mermaid
+sequenceDiagram
+  participant UI as Catalog UI
+  participant API as /api/circulation/*
   participant DB as Firestore
 
-  User->>UI: Tap "Check out"
-  UI->>API: POST /api/circulation/checkout
-  API->>DB: Transaction: book status + tx ledger write
-  DB-->>API: Commit
-  API-->>UI: Updated book + transaction
-  UI-->>User: Loan state refreshed
+  UI->>API: POST /checkout { bookId, loanDays }
+  API->>DB: Transaction: validate availability + set checked_out + insert ledger entry
+  DB-->>API: Updated book + tx
+  API-->>UI: checkout result
 
-  User->>UI: Tap "Check in"
-  UI->>API: POST /api/circulation/checkin
-  API->>DB: Transaction: restore availability + tx ledger write
-  DB-->>API: Commit
-  API-->>UI: Updated book + transaction
+  UI->>API: POST /checkin { bookId }
+  API->>DB: Transaction: validate borrower/role + set available + insert ledger entry
+  DB-->>API: Updated book + tx
+  API-->>UI: checkin result
 ```
 
 ## Data Model
 
 ```mermaid
 erDiagram
-  users ||--o{ circulationTransactions : "memberUid"
-  users ||--o{ books : "createdByUid/updatedByUid"
-  books ||--o{ circulationTransactions : "bookId"
+  USERS ||--o{ CIRCULATION_TRANSACTIONS : "memberUid"
+  USERS ||--o{ BOOKS : "createdByUid"
+  BOOKS ||--o{ CIRCULATION_TRANSACTIONS : "bookId"
 
-  users {
+  USERS {
     string uid PK
     string email
     string displayName
     string role
     string createdAt
     string updatedAt
+    string lastLoginAt
   }
 
-  books {
+  BOOKS {
     string id PK
     string title
     string author
+    string genre
     string availability
     string borrowedByUid
-    string borrowedAt
     string dueDate
+    string searchBlob
+    string createdByUid
+    string updatedByUid
     string updatedAt
   }
 
-  circulationTransactions {
+  CIRCULATION_TRANSACTIONS {
     string id PK
-    string bookId FK
-    string memberUid FK
+    string bookId
     string action
+    string memberUid
+    string actorUid
     string dueDate
     string createdAt
   }
 ```
 
-## API Surface
+## Tech Stack
 
-| Method   | Endpoint                         | Access        | Purpose                                              |
-| -------- | -------------------------------- | ------------- | ---------------------------------------------------- |
-| `GET`    | `/api/books`                     | Authenticated | Search/filter/paginate catalog                       |
-| `POST`   | `/api/books`                     | Admin         | Create book                                          |
-| `GET`    | `/api/books/:id`                 | Authenticated | Read one book                                        |
-| `PATCH`  | `/api/books/:id`                 | Admin         | Update book                                          |
-| `DELETE` | `/api/books/:id`                 | Admin         | Delete book                                          |
-| `POST`   | `/api/circulation/checkout`      | Authenticated | Borrow a book                                        |
-| `POST`   | `/api/circulation/checkin`       | Authenticated | Return a book                                        |
-| `GET`    | `/api/circulation/history`       | Authenticated | Circulation timeline                                 |
-| `POST`   | `/api/ai/enrich-book`            | Admin         | AI metadata enrichment                               |
-| `GET`    | `/api/analytics/overview`        | Authenticated | Dashboard metrics (`range=3,6,12`)                   |
-| `POST`   | `/api/dashboard/ai-overview`     | Authenticated | AI summary and recommendations for dashboard metrics |
-| `POST`   | `/api/catalog/ai-recommendation` | Authenticated | AI next-book suggestion based on member history      |
+- Next.js 16 (App Router, TypeScript strict, no `src/` directory)
+- Tailwind CSS v4 + reusable component primitives
+- Firebase Auth (Google provider) + Firestore
+- Gemini API via `@google/genai`
+- Vitest (unit/integration) + Playwright (e2e)
+- GitHub Actions CI
+- Vercel deployment target
+- `pnpm` package manager
 
-## Branch / PR Strategy
+## Project Structure
+
+```text
+app/
+  (protected)/
+    admin/books/
+    catalog/
+    dashboard/
+    history/
+  api/
+    ai/enrich-book
+    analytics/overview
+    auth/session
+    auth/sync
+    books
+    books/[id]
+    catalog/ai-recommendation
+    circulation/checkin
+    circulation/checkout
+    circulation/history
+    dashboard/ai-overview
+  layout.tsx
+  robots.ts
+  sitemap.ts
+components/
+lib/
+scripts/
+tests/
+e2e/
+proxy.ts
+```
+
+## Prerequisites
+
+- Node.js 20+
+- pnpm 9+
+- Firebase project with:
+  - Authentication enabled (Google provider)
+  - Firestore database created
+  - Service account credentials (Admin SDK)
+- Gemini API key
+
+## Firebase Setup
+
+1. Create a Firebase project.
+2. Create a Web App in Firebase and copy config values.
+3. Enable `Authentication -> Sign-in method -> Google`.
+4. Create Firestore database (Native mode).
+5. Add authorized auth domains:
+   - `localhost`
+   - your Vercel production domain (after deployment)
+6. Create a service account key:
+   - `Project settings -> Service accounts -> Generate new private key`
+   - copy `project_id`, `client_email`, `private_key` into `.env.local` values.
+
+Note: `FIREBASE_PRIVATE_KEY` must keep newline escapes (`\n`) in env format.
+
+## Environment Variables
+
+Copy `.env.example` to `.env.local` and fill all values:
+
+```bash
+cp .env.example .env.local
+```
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `NEXT_PUBLIC_APP_URL` | Yes | App base URL (`http://localhost:3000` in local) |
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | Yes | Firebase web config |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Yes | Firebase auth domain |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Yes | Firebase project id |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | Yes | Firebase storage bucket |
+| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Yes | Firebase sender id |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | Yes | Firebase web app id |
+| `FIREBASE_PROJECT_ID` | Yes | Firebase Admin project id |
+| `FIREBASE_CLIENT_EMAIL` | Yes | Firebase Admin client email |
+| `FIREBASE_PRIVATE_KEY` | Yes | Firebase Admin private key (escaped with `\n`) |
+| `GEMINI_API_KEY` | Yes | Gemini API key |
+
+## Local Development
+
+```bash
+pnpm install
+pnpm dev
+```
+
+Open: `http://localhost:3000`
+
+## Admin Role Bootstrap
+
+Sign in once with Google first (so the profile exists), then promote your account:
+
+```bash
+pnpm bootstrap-admin --email=you@example.com
+# or
+pnpm bootstrap-admin --uid=YOUR_FIREBASE_UID
+```
+
+## Database Seeding (Deterministic)
+
+The seed script performs a destructive reset of:
+
+- `users`
+- `books`
+- `circulationTransactions`
+
+and inserts deterministic demo data:
+
+- 4 users
+- 30 books
+- 40 transactions
+- 12 checked out books (5 overdue, 7 on-time)
+
+### Commands
+
+```bash
+pnpm seed:demo
+pnpm seed:demo --admin-email=your-google-email@example.com
+pnpm seed:demo --dry-run --admin-email=your-google-email@example.com
+pnpm seed:demo --force --admin-email=your-google-email@example.com
+```
+
+### Safety Guard
+
+- By default, destructive seed is allowed only for project IDs containing:
+  - `test`, `dev`, `staging`, `sandbox`, or `demo`
+- Use `--force` only when you intentionally target another project id.
+
+### Important
+
+- Seeding does not create Firebase Auth users.
+- `--admin-email` preserves your ability to access admin pages after reset by upserting your Firestore profile as admin.
+
+## API Reference
+
+### Authentication/session (internal flow)
+
+| Method | Endpoint | Access | Purpose |
+| --- | --- | --- | --- |
+| POST | `/api/auth/session` | Public (token required in body) | Create secure session cookie from Firebase ID token |
+| DELETE | `/api/auth/session` | Authenticated user | Clear session cookie |
+| POST | `/api/auth/sync` | Public (token required in body) | Upsert user profile in `users/{uid}` |
+
+### Books and search
+
+| Method | Endpoint | Access | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/books` | Authenticated | List/search/paginate books |
+| POST | `/api/books` | Admin | Create book |
+| GET | `/api/books/:id` | Authenticated | Get single book |
+| PATCH | `/api/books/:id` | Admin | Update book |
+| DELETE | `/api/books/:id` | Admin | Delete book |
+
+`GET /api/books` query params:
+
+- `q` (title/author/genre/isbn/tags search)
+- `author`
+- `genre`
+- `availability` (`available` or `checked_out`)
+- `page` (default `1`)
+- `limit` (default `10`, max `50`)
+
+### Circulation
+
+| Method | Endpoint | Access | Purpose |
+| --- | --- | --- | --- |
+| POST | `/api/circulation/checkout` | Member/Admin | Checkout a book |
+| POST | `/api/circulation/checkin` | Member/Admin | Checkin a book |
+| GET | `/api/circulation/history` | Authenticated | List immutable transaction history |
+
+Notes:
+
+- Members can only checkout/checkin for themselves.
+- Admin can act for other users.
+- Duplicate checkout on unavailable book is rejected.
+
+### Analytics and AI
+
+| Method | Endpoint | Access | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/analytics/overview` | Authenticated | Dashboard metrics (`totalBooks`, `activeLoans`, `overdueCount`, `monthlyCheckouts`) |
+| POST | `/api/dashboard/ai-overview` | Authenticated | AI operational summary and recommendations |
+| POST | `/api/ai/enrich-book` | Admin | AI metadata enrichment for book forms |
+| POST | `/api/catalog/ai-recommendation` | Authenticated | Personalized next-book recommendation |
+
+## Role Matrix
+
+| Capability | Member | Admin |
+| --- | --- | --- |
+| View catalog / search | Yes | Yes |
+| Checkout / checkin own loans | Yes | Yes |
+| Checkout/checkin on behalf of others | No | Yes |
+| Manage books (CRUD) | No | Yes |
+| AI enrichment for book forms | No | Yes |
+| Dashboard analytics | Scoped | Full |
+
+## Quality, Testing, and CI
+
+### Local Quality Commands
+
+```bash
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm test:e2e
+pnpm build
+```
+
+### CI Workflow
+
+GitHub Actions: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+
+- Runs on pull requests and pushes to `main`
+- Executes:
+  - lint
+  - typecheck
+  - unit/integration tests
+  - production build
+
+## SEO
+
+Implemented baseline SEO:
+
+- Global metadata in `app/layout.tsx`
+- Per-page metadata (`/login`, `/catalog`, `/dashboard`, `/history`, `/admin/books`)
+- Canonical URLs via metadata `alternates`
+- `app/robots.ts` for crawl rules + sitemap location
+- `app/sitemap.ts` generating `/sitemap.xml`
+
+## Deployment (Vercel)
+
+1. Import repository into Vercel.
+2. Add all env vars from `.env.example`.
+3. Deploy.
+4. In Firebase Auth, add your Vercel domain to authorized domains.
+5. Verify:
+   - `/robots.txt`
+   - `/sitemap.xml`
+   - Google SSO login in production
+
+## Branch and PR Strategy
+
+The project started with the original 10-PR roadmap, then added focused refinement PRs as the implementation matured:
 
 1. `chore/01-foundation-readme-env`
 2. `feat/02-ui-shell-seo`
@@ -178,148 +422,26 @@ erDiagram
 23. `chore/23-catalog-ai-card-copy-polish`
 24. `test/24-unit-test-alignment`
 25. `test/25-playwright-alignment`
+26. `chore/26-final-snapshot-alignment`
 
-## Environment Variables
+## Interview Demo Script
 
-Copy `.env.example` to `.env.local`:
-
-```bash
-cp .env.example .env.local
-```
-
-| Variable                                   | Required | Description                               |
-| ------------------------------------------ | -------- | ----------------------------------------- |
-| `NEXT_PUBLIC_APP_URL`                      | Yes      | Base URL (local: `http://localhost:3000`) |
-| `NEXT_PUBLIC_FIREBASE_API_KEY`             | Yes      | Firebase web API key                      |
-| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`         | Yes      | Firebase auth domain                      |
-| `NEXT_PUBLIC_FIREBASE_PROJECT_ID`          | Yes      | Firebase project id                       |
-| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`      | Yes      | Firebase storage bucket                   |
-| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Yes      | Firebase sender id                        |
-| `NEXT_PUBLIC_FIREBASE_APP_ID`              | Yes      | Firebase app id                           |
-| `FIREBASE_PROJECT_ID`                      | Yes      | Firebase Admin project id                 |
-| `FIREBASE_CLIENT_EMAIL`                    | Yes      | Firebase Admin service account email      |
-| `FIREBASE_PRIVATE_KEY`                     | Yes      | Firebase Admin private key (`\n` escaped) |
-| `GEMINI_API_KEY`                           | Yes      | Gemini API key (server-side only)         |
-
-## Local Development
-
-```bash
-pnpm install
-pnpm dev
-```
-
-Open `http://localhost:3000`.
-
-## Promote a User to Admin
-
-After signing in once:
-
-```bash
-pnpm bootstrap-admin --email=you@example.com
-# or
-pnpm bootstrap-admin --uid=YOUR_FIREBASE_UID
-```
-
-## Database Seeding
-
-Seeding is **destructive** and resets Firestore collections before inserting deterministic demo data:
-
-- `circulationTransactions`
-- `books`
-- `users`
-
-Recommended command (preserves your own admin access after reset):
-
-```bash
-pnpm seed:demo --admin-email=your-google-email@example.com
-```
-
-Available modes:
-
-```bash
-pnpm seed:demo
-pnpm seed:demo --dry-run
-pnpm seed:demo --admin-email=you@example.com
-pnpm seed:demo --force --admin-email=you@example.com
-pnpm seed:demo:force --admin-email=you@example.com
-```
-
-Safety guard behavior:
-
-- By default, seeding is allowed only when `FIREBASE_PROJECT_ID` contains one of `test`, `dev`, `staging`, `sandbox`, `demo`.
-- Use `--force` only when you intentionally want to seed a non-test project.
-- `--admin-email` must resolve to an existing Firebase Auth user, otherwise the command fails.
-
-## Testing and Quality
-
-```bash
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
-```
-
-Playwright e2e happy-path smoke:
-
-```bash
-pnpm test:e2e:install
-pnpm test:e2e
-```
-
-Testing coverage in this version:
-
-- Unit: validators, guards, search behavior.
-- Integration: key API route handlers.
-- E2E: login/SSO entry happy path.
-
-## CI
-
-GitHub Actions workflow: `.github/workflows/ci.yml`
-
-Runs on PRs and `main` pushes:
-
-- `pnpm lint`
-- `pnpm typecheck`
-- `pnpm test`
-- `pnpm build`
-
-## Firestore Indexes
-
-Current index:
-
-- `books`: `availability` (ASC) + `updatedAt` (DESC)
-
-Deploy:
-
-```bash
-firebase deploy --only firestore:indexes
-```
-
-## Vercel Deployment Checklist
-
-1. Create a Vercel project linked to this repository.
-2. Set all environment variables from the table above in Vercel Project Settings.
-3. Ensure production `NEXT_PUBLIC_APP_URL` matches your Vercel domain.
-4. Confirm Firebase Auth authorized domains include your Vercel domain.
-5. Deploy and verify:
-   - `/login` Google sign-in
-   - `/catalog` search/filter + circulation actions
-   - `/history` timeline
-   - `/dashboard` analytics data
-   - `/admin/books` CRUD + AI enrichment
-
-## Demo Script (Interview)
-
-1. Sign in as admin.
-2. Go to `/admin/books`, create a book, run "Enrich with AI", save.
-3. Open `/catalog`, find the new book, checkout and checkin it.
-4. Open `/history`, show immutable checkout/checkin entries.
-5. Open `/dashboard`, toggle `3M/6M/12M`, explain utilization and overdue pressure.
-6. Sign in as member and show role-scoped differences.
-7. Open `/robots.txt` and `/sitemap.xml` to confirm SEO artifacts are published.
+1. Sign in with Google as admin.
+2. Open `Manage Books` and create/edit/delete one book.
+3. Use AI enrichment in the admin form.
+4. Go to `Catalog`, search/filter, checkout a book.
+5. Open `History` and show immutable ledger entries.
+6. Open `Dashboard` and show:
+   - active loans
+   - overdue count
+   - trend charts with tooltips and range toggles
+   - AI operations brief
+7. Return to `Catalog` and show AI next-book recommendation.
+8. Run `pnpm seed:demo --admin-email=<your-email>` to demonstrate repeatable state reset.
 
 ## Known Limitations (v1)
 
-- Firestore querying is optimized for demo-scale data; larger datasets need deeper index/query tuning.
-- E2E suite currently covers a smoke happy path; full multi-user end-to-end flows can be expanded.
-- AI enrichment fallback is deterministic but intentionally simple compared with richer model pipelines.
+- Search is currently done on a bounded dataset (`limit(500)`) before in-memory filtering.
+- Firestore security rules are intentionally locked down because access is mediated through server APIs.
+- E2E coverage is intentionally light (single smoke flow) for this version.
+- AI outputs use deterministic fallbacks when provider output is invalid/unavailable.

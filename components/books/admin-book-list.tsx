@@ -2,6 +2,7 @@
 
 import { Pencil, Trash2 } from 'lucide-react';
 
+import { BookCoverImage } from '@/components/books/book-cover-image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -31,16 +32,30 @@ export function AdminBookList({
       {books.map((book) => (
         <Card
           key={book.id}
-          className="group flex transform-gpu flex-col gap-3 transition-[transform,box-shadow,border-color] duration-300 ease-[var(--motion-smooth)] hover:-translate-y-0.5 hover:border-[#c8d4ff] sm:flex-row sm:items-center sm:justify-between"
+          className="group flex transform-gpu flex-col gap-3 transition-[transform,box-shadow,border-color] duration-[560ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-safe:hover:-translate-y-0.5 motion-safe:hover:border-[#c8d4ff] sm:flex-row sm:items-center sm:justify-between"
         >
-          <div className="space-y-1">
-            <p className="font-semibold text-[var(--text-primary)]">{book.title}</p>
-            <p className="text-sm text-[var(--text-muted)]">{book.author}</p>
-            <div className="flex flex-wrap gap-1">
-              <Badge variant={book.availability === 'available' ? 'accent' : 'default'}>
-                {book.availability === 'available' ? 'Available' : 'Checked out'}
-              </Badge>
-              {book.genre ? <Badge variant="muted">{book.genre}</Badge> : null}
+          <div className="flex gap-3">
+            <BookCoverImage
+              src={book.coverUrl}
+              alt={`${book.title} cover`}
+              width={112}
+              height={160}
+              sizes="56px"
+              className="h-20 w-14 shrink-0 rounded-lg border border-[var(--border-subtle)]"
+            />
+            <div className="space-y-1">
+              <p className="font-semibold text-[var(--text-primary)] transition-colors duration-[480ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:text-[var(--brand-primary)]">
+                {book.title}
+              </p>
+              <p className="text-sm text-[var(--text-muted)] transition-colors duration-[480ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:text-[var(--text-secondary)]">
+                {book.author}
+              </p>
+              <div className="flex flex-wrap gap-1">
+                <Badge variant={book.availability === 'available' ? 'secondary' : 'default'}>
+                  {book.availability === 'available' ? 'Available' : 'Checked out'}
+                </Badge>
+                {book.genre ? <Badge variant="outline">{book.genre}</Badge> : null}
+              </div>
             </div>
           </div>
           <div className="flex gap-2">

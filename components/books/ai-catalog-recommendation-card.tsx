@@ -96,7 +96,7 @@ export function AiCatalogRecommendationCard({
                   {recommendation.recommendedBook.author}
                 </p>
                 {recommendation.recommendedBook.genre ? (
-                  <Badge variant="muted">{recommendation.recommendedBook.genre}</Badge>
+                  <Badge variant="outline">{recommendation.recommendedBook.genre}</Badge>
                 ) : null}
               </div>
             </div>

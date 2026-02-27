@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { handleApiError } from '@/lib/api/errors';
-import { parseJsonBody } from '@/lib/api/request';
 import { requireApiUser } from '@/lib/auth/api-auth';
 import { requireRole } from '@/lib/auth/permissions';
+import { parseJsonBody } from '@/lib/api/request';
 import { bookUpdateSchema } from '@/lib/schemas/book';
 import { deleteBook, getBookById, updateBook } from '@/lib/services/books';
 
@@ -41,6 +41,7 @@ export async function PATCH(
 
     const { id } = await context.params;
     const updated = await updateBook(id, parsedBody.data, user.uid);
+
     return NextResponse.json(updated);
   } catch (error) {
     return handleApiError(error);
@@ -57,6 +58,7 @@ export async function DELETE(
 
     const { id } = await context.params;
     await deleteBook(id);
+
     return NextResponse.json({ ok: true });
   } catch (error) {
     return handleApiError(error);

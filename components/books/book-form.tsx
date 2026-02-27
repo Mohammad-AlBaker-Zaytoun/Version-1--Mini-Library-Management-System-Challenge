@@ -1,16 +1,14 @@
 'use client';
 
 import { Sparkles } from 'lucide-react';
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { authFetch } from '@/lib/auth/client';
-import { normalizeTags } from '@/lib/services/book-utils';
-import type { Book, BookAiEnrichmentResponse } from '@/lib/types';
+import type { Book } from '@/lib/types';
 
 export interface BookFormValues {
   title: string;
@@ -43,6 +41,17 @@ interface BookFormProps {
     aiSummary?: string;
     aiSuggestedGenre?: string;
   }) => Promise<void>;
+  onEnrich: (payload: {
+    title: string;
+    author: string;
+    description?: string;
+    genre?: string;
+    tags: string[];
+  }) => Promise<{
+    summary: string;
+    suggestedGenre: string;
+    suggestedTags: string[];
+  }>;
 }
 
 function toFormValues(initialValues?: Partial<Book>): BookFormValues {
@@ -60,15 +69,6 @@ function toFormValues(initialValues?: Partial<Book>): BookFormValues {
   };
 }
 
-async function readApiError(response: Response, fallback: string): Promise<string> {
-  try {
-    const payload = (await response.json()) as { error?: string };
-    return payload.error ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
-
 export function BookForm({
   mode,
   initialValues,
@@ -76,24 +76,19 @@ export function BookForm({
   disabled,
   onCancel,
   onSubmit,
+  onEnrich,
 }: BookFormProps) {
   const [values, setValues] = useState<BookFormValues>(() => toFormValues(initialValues));
-  const [error, setError] = useState<string | null>(null);
-  const [enrichError, setEnrichError] = useState<string | null>(null);
-  const [enrichStatus, setEnrichStatus] = useState<string | null>(null);
   const [isEnriching, setIsEnriching] = useState(false);
-  const isLocked = Boolean(disabled || loading || isEnriching);
-
-  useEffect(() => {
-    setValues(toFormValues(initialValues));
-    setError(null);
-    setEnrichError(null);
-    setEnrichStatus(null);
-    setIsEnriching(false);
-  }, [initialValues, mode]);
+  const [error, setError] = useState<string | null>(null);
+  const isLocked = Boolean(disabled || loading) || isEnriching;
 
   const parsedTags = useMemo(
-    () => normalizeTags(values.tags.split(',').map((tag) => tag.trim())),
+    () =>
+      values.tags
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter(Boolean),
     [values.tags],
   );
 
@@ -101,7 +96,7 @@ export function BookForm({
     setValues((current) => ({ ...current, [key]: value }));
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     try {
@@ -120,8 +115,6 @@ export function BookForm({
 
       if (mode === 'create') {
         setValues(toFormValues());
-        setEnrichError(null);
-        setEnrichStatus(null);
       }
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Unable to save book';
@@ -129,58 +122,27 @@ export function BookForm({
     }
   }
 
-  async function handleAiEnrichment() {
-    if (isLocked) {
-      return;
-    }
-
-    if (!values.title.trim() || !values.author.trim()) {
-      setEnrichStatus(null);
-      setEnrichError('Provide at least title and author before running AI enrichment.');
-      return;
-    }
-
-    setEnrichError(null);
-    setEnrichStatus(null);
+  async function handleEnrich() {
+    setError(null);
     setIsEnriching(true);
-
     try {
-      const response = await authFetch('/api/ai/enrich-book', {
-        method: 'POST',
-        body: JSON.stringify({
-          title: values.title,
-          author: values.author,
-          isbn: values.isbn || undefined,
-          genre: values.genre || undefined,
-          publishedYear: values.publishedYear ? Number(values.publishedYear) : undefined,
-          description: values.description || undefined,
-          tags: parsedTags,
-        }),
+      const enrichment = await onEnrich({
+        title: values.title,
+        author: values.author,
+        description: values.description || undefined,
+        genre: values.genre || undefined,
+        tags: parsedTags,
       });
-
-      if (!response.ok) {
-        throw new Error(await readApiError(response, 'Unable to enrich metadata'));
-      }
-
-      const enrichment = (await response.json()) as BookAiEnrichmentResponse;
-      const mergedTags = normalizeTags([...parsedTags, ...enrichment.tags]).join(', ');
 
       setValues((current) => ({
         ...current,
-        tags: mergedTags,
-        aiSummary: enrichment.aiSummary,
-        aiSuggestedGenre: enrichment.aiSuggestedGenre,
-        genre: current.genre.trim() ? current.genre : enrichment.aiSuggestedGenre,
+        aiSummary: enrichment.summary,
+        aiSuggestedGenre: enrichment.suggestedGenre,
+        tags: [...new Set([...parsedTags, ...enrichment.suggestedTags])].join(', '),
       }));
-
-      setEnrichStatus(
-        enrichment.source === 'ai'
-          ? 'AI enrichment generated and applied to the form.'
-          : 'Fallback enrichment applied because AI output was unavailable.',
-      );
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : 'Unable to enrich metadata';
-      setEnrichError(message);
+      const message = cause instanceof Error ? cause.message : 'AI enrichment failed';
+      setError(message);
     } finally {
       setIsEnriching(false);
     }
@@ -191,7 +153,7 @@ export function BookForm({
       <CardHeader>
         <CardTitle>{mode === 'create' ? 'Add new book' : 'Edit book'}</CardTitle>
         <CardDescription>
-          Admin-only book management with validation, audit fields, and responsive form layout.
+          Keep metadata complete for better search and analytics quality.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -270,31 +232,6 @@ export function BookForm({
             />
           </div>
 
-          <div className="space-y-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)]/55 p-3">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-[var(--text-primary)]">AI enrichment</p>
-                <p className="text-xs text-[var(--text-secondary)]">
-                  Generate summary, suggested genre, and tags from current metadata.
-                </p>
-              </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                onClick={() => void handleAiEnrichment()}
-                loading={isEnriching}
-                loadingText="Generating..."
-                disabled={isLocked || !values.title.trim() || !values.author.trim()}
-              >
-                <Sparkles className="mr-1 h-4 w-4" />
-                Enrich with AI
-              </Button>
-            </div>
-            {enrichStatus ? <p className="text-xs text-[#0f6a45]">{enrichStatus}</p> : null}
-            {enrichError ? <p className="text-xs text-red-600">{enrichError}</p> : null}
-          </div>
-
           <div className="space-y-1">
             <Label htmlFor="tags">Tags (comma-separated)</Label>
             <Input
@@ -305,24 +242,45 @@ export function BookForm({
             />
           </div>
 
-          <div className="space-y-1">
-            <Label htmlFor="aiSummary">AI Summary</Label>
-            <Textarea
-              id="aiSummary"
-              value={values.aiSummary}
-              onChange={(event) => updateField('aiSummary', event.target.value)}
-              disabled={isLocked}
-            />
-          </div>
+          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-3">
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm font-medium text-[var(--text-secondary)]">
+                AI catalog assistant
+              </p>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => void handleEnrich()}
+                loading={isEnriching}
+                loadingText="Enriching..."
+                disabled={Boolean(disabled || loading) || !values.title || !values.author}
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                Generate metadata
+              </Button>
+            </div>
 
-          <div className="space-y-1">
-            <Label htmlFor="aiSuggestedGenre">AI Suggested Genre</Label>
-            <Input
-              id="aiSuggestedGenre"
-              value={values.aiSuggestedGenre}
-              onChange={(event) => updateField('aiSuggestedGenre', event.target.value)}
-              disabled={isLocked}
-            />
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label htmlFor="aiSummary">AI Summary</Label>
+                <Textarea
+                  id="aiSummary"
+                  value={values.aiSummary}
+                  onChange={(event) => updateField('aiSummary', event.target.value)}
+                  disabled={isLocked}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="aiSuggestedGenre">AI Suggested Genre</Label>
+                <Input
+                  id="aiSuggestedGenre"
+                  value={values.aiSuggestedGenre}
+                  onChange={(event) => updateField('aiSuggestedGenre', event.target.value)}
+                  disabled={isLocked}
+                />
+              </div>
+            </div>
           </div>
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
