@@ -1,7 +1,7 @@
 'use client';
 
 import Image, { type ImageLoader } from 'next/image';
-import { useEffect, useState, type ReactEventHandler } from 'react';
+import { useEffect, useState } from 'react';
 
 import { DEFAULT_BOOK_COVER_URL, getBookCoverUrl } from '@/lib/books/cover';
 import { cn } from '@/lib/utils';
@@ -14,7 +14,7 @@ interface BookCoverImageProps {
   height?: number;
   sizes?: string;
   priority?: boolean;
-  onError?: ReactEventHandler<HTMLImageElement>;
+  onError?: React.ReactEventHandler<HTMLImageElement>;
 }
 
 const passthroughLoader: ImageLoader = ({ src }) => src;

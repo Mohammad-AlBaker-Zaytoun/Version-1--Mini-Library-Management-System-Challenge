@@ -28,7 +28,7 @@ export function AiCatalogRecommendationCard({
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl">AI Next-Book Suggestion</CardTitle>
+          <CardTitle>AI Next-Book Suggestion</CardTitle>
           <CardDescription>Analyzing your circulation behavior...</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -44,7 +44,7 @@ export function AiCatalogRecommendationCard({
       <CardHeader className="mb-0">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <CardTitle className="inline-flex items-center gap-2 text-xl">
+            <CardTitle className="inline-flex items-center gap-2">
               <Sparkles className="h-4.5 w-4.5 text-[var(--brand-primary)]" />
               AI Next-Book Suggestion
             </CardTitle>
@@ -85,7 +85,7 @@ export function AiCatalogRecommendationCard({
                 className="h-24 w-16 shrink-0 rounded-lg border border-[var(--border-subtle)]"
               />
               <div className="space-y-1">
-                <p className="inline-flex items-center gap-1 text-xs font-semibold tracking-[0.08em] text-[var(--text-muted)] uppercase">
+                <p className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
                   <BookHeart className="h-3.5 w-3.5" />
                   Suggested Next Checkout
                 </p>
@@ -104,7 +104,7 @@ export function AiCatalogRecommendationCard({
             <p className="text-sm leading-6 text-[var(--text-primary)]">{recommendation.reason}</p>
 
             <div className="space-y-1">
-              <p className="text-xs font-semibold tracking-[0.08em] text-[var(--text-muted)] uppercase">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
                 Why this fits you
               </p>
               <ul className="space-y-1 text-sm text-[var(--text-secondary)]">
@@ -119,7 +119,7 @@ export function AiCatalogRecommendationCard({
 
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button variant="secondary" onClick={onFocusRecommendation}>
-                Find in catalog
+                Find this in catalog
               </Button>
             </div>
           </div>
