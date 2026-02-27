@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { HistoryClient } from '@/components/history/history-client';
+import { HistoryClient } from '@/components/dashboard/history-client';
 
 export const metadata: Metadata = {
   title: 'History',
