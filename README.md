@@ -1,116 +1,62 @@
 # Mini Library Management System (Version 1)
+[![CI](https://github.com/Mohammad-AlBaker-Zaytoun/Version-1--Mini-Library-Management-System-Challenge/actions/workflows/ci.yml/badge.svg)](https://github.com/Mohammad-AlBaker-Zaytoun/Version-1--Mini-Library-Management-System-Challenge/actions/workflows/ci.yml)
 
-Incremental, interview-focused project scaffold for building a mobile-first library platform with Next.js + Firebase + AI.
+Interview-focused, incremental implementation of a mobile-first library platform built with Next.js, Firebase, and practical AI features.
 
-Current status: **PR8 Overdue + Analytics** (role-scoped dashboard metrics, monthly trend charts, and overdue tracking across catalog and dashboard).
+Current status: **PR9 Quality + CI + README Final**.
 
 ## Goals
 
 - Build in small, reviewable PRs.
-- Keep architecture production-minded from day one.
-- Prioritize mobile-first UX and clean engineering practices.
+- Keep code production-minded from day one.
+- Prioritize responsive UX (mobile-first).
+- Enforce authentication, RBAC, and API validation.
+- Add practical AI features without leaking secrets.
 
-## Planned Stack
+## Stack
 
 - Next.js App Router + TypeScript strict (no `src/`)
 - Tailwind CSS
-- Firebase (Auth + Firestore)
-- Gemini API features
-- Vercel deployment
+- Firebase Auth (Google SSO) + Firestore
+- Gemini API (server-side usage only)
+- Vercel deployment target
+- pnpm package manager
 
-## Current Scope (PR8)
+## Implemented Features
 
-- Next.js project initialized
-- Tailwind CSS + global theme tokens
-- TypeScript strict config
-- ESLint + Prettier setup
-- `.env.example` contract added
-- Mobile-first app shell and route scaffolds:
-  - `/`
-  - `/login`
-  - `/catalog`
-  - `/dashboard`
-  - `/history`
-- Authentication and authorization scaffold:
-  - Firebase client/admin wiring
-  - Google SSO sign-in and sign-out
-  - Session cookie API (`/api/auth/session`)
-  - User profile sync API (`/api/auth/sync`)
-  - route protection middleware (`proxy.ts`)
-  - server-side protected page checks
-  - role-aware admin route (`/admin`)
-  - admin role bootstrap script (`pnpm bootstrap-admin --email=you@example.com`)
-- Book management core:
-  - admin books workspace (`/admin/books`)
-  - add/edit/delete book flows
-  - API handlers:
-    - `GET /api/books`
-    - `POST /api/books`
-    - `GET /api/books/:id`
-    - `PATCH /api/books/:id`
-    - `DELETE /api/books/:id`
-  - Zod validation for reads/writes
-  - Firestore book service with audit fields (`createdByUid`, `updatedByUid`, timestamps)
-- Catalog discoverability (PR5):
-  - mobile-first searchable catalog UI at `/catalog`
-  - debounced query updates (title/author/genre/tags/availability)
-  - URL-synced filter state and pagination (`page` param)
-  - no-result and error states with retry/reset actions
-  - server-side filtering contract for:
-    - `q`
-    - `author`
-    - `genre`
-    - `tags` (comma-separated)
-    - `availability`
-    - `page`
-    - `limit`
-- Circulation and history (PR6):
-  - circulation APIs:
-    - `POST /api/circulation/checkout`
-    - `POST /api/circulation/checkin`
-    - `GET /api/circulation/history`
-  - transaction-safe checkout/checkin state transitions in Firestore
-  - immutable `circulationTransactions` ledger entries for each circulation action
-  - role-aware behavior:
-    - `member`: can checkout/checkin for self only
-    - `admin`: can process circulation across members (API supports `memberUid`)
-  - `/catalog` now includes checkout/checkin actions with loading locks
-  - `/history` now renders live timeline, action filters, and pagination
-- AI enrichment assistant (PR7):
-  - API endpoint:
-    - `POST /api/ai/enrich-book` (admin-only)
-  - admin book form now supports "Enrich with AI" action
-  - AI returns:
-    - short summary (`aiSummary`)
-    - suggested genre (`aiSuggestedGenre`)
-    - normalized tags
-  - output is schema-validated server-side before returning to client
-  - fallback enrichment is returned when Gemini is unavailable or invalid (source flag provided)
-  - Gemini key is used server-side only (`GEMINI_API_KEY` is never exposed in the browser)
-- Overdue and analytics layer (PR8):
-  - analytics API endpoint:
-    - `GET /api/analytics/overview?range=3|6|12`
-  - role-scoped dashboard metrics:
-    - admin: organization-wide active loans, overdue pressure, utilization, monthly flow
-    - member: personal loan metrics with catalog context
-  - dashboard now includes:
-    - KPI cards
-    - month range toggle (`3M` / `6M` / `12M`)
-    - animated monthly checkout/checkin chart
-    - circulation composition donut and progress bars
-  - catalog search supports overdue filtering:
-    - query flag `overdue=true`
-    - UI toggle "Overdue only"
-    - overdue badge on book cards
+- Authentication and RBAC:
+  - Google SSO login/logout
+  - session cookie sync
+  - protected routes via `proxy.ts`
+  - roles: `admin`, `member`
+- Book management:
+  - admin CRUD at `/admin/books`
+  - validation via Zod
+  - audit fields + normalized search metadata
+- Catalog:
+  - search by title/author/genre/tags
+  - availability + overdue filters
+  - URL-synced query state and pagination
+  - checkout/checkin actions with lock/loading states
+- Circulation:
+  - checkout/checkin API workflows
+  - immutable transaction ledger (`circulationTransactions`)
+  - self-only member restrictions with admin overrides
+- Analytics:
+  - `/api/analytics/overview?range=3|6|12`
+  - role-scoped dashboard metrics
+  - overdue pressure, utilization, monthly checkout/checkin charts
+- AI features:
+  - admin metadata enrichment endpoint (`POST /api/ai/enrich-book`)
+  - AI summary + genre + tag suggestions in admin book form
+  - strict output validation with fallback response mode
 - SEO baseline:
-  - root and per-page metadata
-  - OpenGraph/Twitter cards
-  - canonical tags
-  - `app/robots.ts`
+  - metadata + OpenGraph/Twitter
+  - canonical routes
   - `app/sitemap.ts`
-- README with architecture + branch strategy
+  - `app/robots.ts`
 
-## Architecture (Target)
+## Architecture
 
 ```mermaid
 flowchart LR
@@ -119,6 +65,29 @@ flowchart LR
   API --> DB[(Firestore)]
   API --> AI[Gemini API]
   CLIENT[Firebase Client Auth] --> UI
+```
+
+## Core Sequence
+
+```mermaid
+sequenceDiagram
+  actor User
+  participant UI as Catalog UI
+  participant API as Next.js API
+  participant DB as Firestore
+
+  User->>UI: Tap "Check out"
+  UI->>API: POST /api/circulation/checkout
+  API->>DB: Transaction: book status + tx ledger write
+  DB-->>API: Commit
+  API-->>UI: Updated book + transaction
+  UI-->>User: Loan state refreshed
+
+  User->>UI: Tap "Check in"
+  UI->>API: POST /api/circulation/checkin
+  API->>DB: Transaction: restore availability + tx ledger write
+  DB-->>API: Commit
+  API-->>UI: Updated book + transaction
 ```
 
 ## Data Model
@@ -159,7 +128,22 @@ erDiagram
   }
 ```
 
-## Branch and PR Strategy
+## API Surface
+
+| Method | Endpoint | Access | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/api/books` | Authenticated | Search/filter/paginate catalog |
+| `POST` | `/api/books` | Admin | Create book |
+| `GET` | `/api/books/:id` | Authenticated | Read one book |
+| `PATCH` | `/api/books/:id` | Admin | Update book |
+| `DELETE` | `/api/books/:id` | Admin | Delete book |
+| `POST` | `/api/circulation/checkout` | Authenticated | Borrow a book |
+| `POST` | `/api/circulation/checkin` | Authenticated | Return a book |
+| `GET` | `/api/circulation/history` | Authenticated | Circulation timeline |
+| `POST` | `/api/ai/enrich-book` | Admin | AI metadata enrichment |
+| `GET` | `/api/analytics/overview` | Authenticated | Dashboard metrics (`range=3|6|12`) |
+
+## Branch / PR Strategy
 
 1. `chore/01-foundation-readme-env`
 2. `feat/02-ui-shell-seo`
@@ -174,7 +158,7 @@ erDiagram
 
 ## Environment Variables
 
-Copy `.env.example` to `.env.local` and fill values:
+Copy `.env.example` to `.env.local`:
 
 ```bash
 cp .env.example .env.local
@@ -182,17 +166,17 @@ cp .env.example .env.local
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `NEXT_PUBLIC_APP_URL` | Yes | App base URL (`http://localhost:3000`) |
-| `NEXT_PUBLIC_FIREBASE_API_KEY` | Yes | Firebase web app api key |
+| `NEXT_PUBLIC_APP_URL` | Yes | Base URL (local: `http://localhost:3000`) |
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | Yes | Firebase web API key |
 | `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Yes | Firebase auth domain |
 | `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Yes | Firebase project id |
 | `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | Yes | Firebase storage bucket |
 | `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Yes | Firebase sender id |
-| `NEXT_PUBLIC_FIREBASE_APP_ID` | Yes | Firebase web app id |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | Yes | Firebase app id |
 | `FIREBASE_PROJECT_ID` | Yes | Firebase Admin project id |
 | `FIREBASE_CLIENT_EMAIL` | Yes | Firebase Admin service account email |
 | `FIREBASE_PRIVATE_KEY` | Yes | Firebase Admin private key (`\n` escaped) |
-| `GEMINI_API_KEY` | Yes | Gemini API key |
+| `GEMINI_API_KEY` | Yes | Gemini API key (server-side only) |
 
 ## Local Development
 
@@ -203,22 +187,9 @@ pnpm dev
 
 Open `http://localhost:3000`.
 
-## Auth + RBAC Notes
-
-- Protected pages:
-  - `/catalog`
-  - `/dashboard`
-  - `/history`
-  - `/admin` and `/admin/books` (admin-only)
-- Unauthenticated requests are redirected to `/login`.
-- Authenticated users visiting `/login` are redirected to `/catalog`.
-- Role model:
-  - `member`
-  - `admin`
-
 ## Promote a User to Admin
 
-After signing in once with Google:
+After signing in once:
 
 ```bash
 pnpm bootstrap-admin --email=you@example.com
@@ -226,22 +197,75 @@ pnpm bootstrap-admin --email=you@example.com
 pnpm bootstrap-admin --uid=YOUR_FIREBASE_UID
 ```
 
+## Testing and Quality
+
+```bash
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+Playwright e2e happy-path smoke:
+
+```bash
+pnpm test:e2e:install
+pnpm test:e2e
+```
+
+Testing coverage in this version:
+
+- Unit: validators, guards, search behavior.
+- Integration: key API route handlers.
+- E2E: login/SSO entry happy path.
+
+## CI
+
+GitHub Actions workflow: `.github/workflows/ci.yml`
+
+Runs on PRs and `main` pushes:
+
+- `pnpm lint`
+- `pnpm typecheck`
+- `pnpm test`
+- `pnpm build`
+
 ## Firestore Indexes
 
-Catalog search uses an index for availability-filtered, recency-sorted book queries:
+Current index:
 
 - `books`: `availability` (ASC) + `updatedAt` (DESC)
 
-Deploy indexes with:
+Deploy:
 
 ```bash
 firebase deploy --only firestore:indexes
 ```
 
-## Quality Commands
+## Vercel Deployment Checklist
 
-```bash
-pnpm lint
-pnpm typecheck
-pnpm build
-```
+1. Create a Vercel project linked to this repository.
+2. Set all environment variables from the table above in Vercel Project Settings.
+3. Ensure production `NEXT_PUBLIC_APP_URL` matches your Vercel domain.
+4. Confirm Firebase Auth authorized domains include your Vercel domain.
+5. Deploy and verify:
+   - `/login` Google sign-in
+   - `/catalog` search/filter + circulation actions
+   - `/history` timeline
+   - `/dashboard` analytics data
+   - `/admin/books` CRUD + AI enrichment
+
+## Demo Script (Interview)
+
+1. Sign in as admin.
+2. Go to `/admin/books`, create a book, run “Enrich with AI”, save.
+3. Open `/catalog`, find the new book, checkout and checkin it.
+4. Open `/history`, show immutable checkout/checkin entries.
+5. Open `/dashboard`, toggle `3M/6M/12M`, explain utilization and overdue pressure.
+6. Sign in as member and show role-scoped differences.
+
+## Known Limitations (v1)
+
+- Firestore querying is optimized for demo-scale data; larger datasets need deeper index/query tuning.
+- E2E suite currently covers a smoke happy path; full multi-user end-to-end flows can be expanded.
+- AI enrichment fallback is deterministic but intentionally simple compared with richer model pipelines.
