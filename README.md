@@ -1,9 +1,10 @@
 # Mini Library Management System (Version 1)
+
 [![CI](https://github.com/Mohammad-AlBaker-Zaytoun/Version-1--Mini-Library-Management-System-Challenge/actions/workflows/ci.yml/badge.svg)](https://github.com/Mohammad-AlBaker-Zaytoun/Version-1--Mini-Library-Management-System-Challenge/actions/workflows/ci.yml)
 
 Interview-focused, incremental implementation of a mobile-first library platform built with Next.js, Firebase, and practical AI features.
 
-Current status: **PR9 Quality + CI + README Final**.
+Current status: **PR10 Firestore Seeding**.
 
 ## Goals
 
@@ -130,18 +131,18 @@ erDiagram
 
 ## API Surface
 
-| Method | Endpoint | Access | Purpose |
-| --- | --- | --- | --- |
-| `GET` | `/api/books` | Authenticated | Search/filter/paginate catalog |
-| `POST` | `/api/books` | Admin | Create book |
-| `GET` | `/api/books/:id` | Authenticated | Read one book |
-| `PATCH` | `/api/books/:id` | Admin | Update book |
-| `DELETE` | `/api/books/:id` | Admin | Delete book |
-| `POST` | `/api/circulation/checkout` | Authenticated | Borrow a book |
-| `POST` | `/api/circulation/checkin` | Authenticated | Return a book |
-| `GET` | `/api/circulation/history` | Authenticated | Circulation timeline |
-| `POST` | `/api/ai/enrich-book` | Admin | AI metadata enrichment |
-| `GET` | `/api/analytics/overview` | Authenticated | Dashboard metrics (`range=3|6|12`) |
+| Method   | Endpoint                    | Access        | Purpose                            |
+| -------- | --------------------------- | ------------- | ---------------------------------- |
+| `GET`    | `/api/books`                | Authenticated | Search/filter/paginate catalog     |
+| `POST`   | `/api/books`                | Admin         | Create book                        |
+| `GET`    | `/api/books/:id`            | Authenticated | Read one book                      |
+| `PATCH`  | `/api/books/:id`            | Admin         | Update book                        |
+| `DELETE` | `/api/books/:id`            | Admin         | Delete book                        |
+| `POST`   | `/api/circulation/checkout` | Authenticated | Borrow a book                      |
+| `POST`   | `/api/circulation/checkin`  | Authenticated | Return a book                      |
+| `GET`    | `/api/circulation/history`  | Authenticated | Circulation timeline               |
+| `POST`   | `/api/ai/enrich-book`       | Admin         | AI metadata enrichment             |
+| `GET`    | `/api/analytics/overview`   | Authenticated | Dashboard metrics (`range=3,6,12`) |
 
 ## Branch / PR Strategy
 
@@ -164,19 +165,19 @@ Copy `.env.example` to `.env.local`:
 cp .env.example .env.local
 ```
 
-| Variable | Required | Description |
-| --- | --- | --- |
-| `NEXT_PUBLIC_APP_URL` | Yes | Base URL (local: `http://localhost:3000`) |
-| `NEXT_PUBLIC_FIREBASE_API_KEY` | Yes | Firebase web API key |
-| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Yes | Firebase auth domain |
-| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Yes | Firebase project id |
-| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | Yes | Firebase storage bucket |
-| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Yes | Firebase sender id |
-| `NEXT_PUBLIC_FIREBASE_APP_ID` | Yes | Firebase app id |
-| `FIREBASE_PROJECT_ID` | Yes | Firebase Admin project id |
-| `FIREBASE_CLIENT_EMAIL` | Yes | Firebase Admin service account email |
-| `FIREBASE_PRIVATE_KEY` | Yes | Firebase Admin private key (`\n` escaped) |
-| `GEMINI_API_KEY` | Yes | Gemini API key (server-side only) |
+| Variable                                   | Required | Description                               |
+| ------------------------------------------ | -------- | ----------------------------------------- |
+| `NEXT_PUBLIC_APP_URL`                      | Yes      | Base URL (local: `http://localhost:3000`) |
+| `NEXT_PUBLIC_FIREBASE_API_KEY`             | Yes      | Firebase web API key                      |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`         | Yes      | Firebase auth domain                      |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID`          | Yes      | Firebase project id                       |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`      | Yes      | Firebase storage bucket                   |
+| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Yes      | Firebase sender id                        |
+| `NEXT_PUBLIC_FIREBASE_APP_ID`              | Yes      | Firebase app id                           |
+| `FIREBASE_PROJECT_ID`                      | Yes      | Firebase Admin project id                 |
+| `FIREBASE_CLIENT_EMAIL`                    | Yes      | Firebase Admin service account email      |
+| `FIREBASE_PRIVATE_KEY`                     | Yes      | Firebase Admin private key (`\n` escaped) |
+| `GEMINI_API_KEY`                           | Yes      | Gemini API key (server-side only)         |
 
 ## Local Development
 
@@ -196,6 +197,36 @@ pnpm bootstrap-admin --email=you@example.com
 # or
 pnpm bootstrap-admin --uid=YOUR_FIREBASE_UID
 ```
+
+## Database Seeding
+
+Seeding is **destructive** and resets Firestore collections before inserting deterministic demo data:
+
+- `circulationTransactions`
+- `books`
+- `users`
+
+Recommended command (preserves your own admin access after reset):
+
+```bash
+pnpm seed:demo --admin-email=your-google-email@example.com
+```
+
+Available modes:
+
+```bash
+pnpm seed:demo
+pnpm seed:demo --dry-run
+pnpm seed:demo --admin-email=you@example.com
+pnpm seed:demo --force --admin-email=you@example.com
+pnpm seed:demo:force --admin-email=you@example.com
+```
+
+Safety guard behavior:
+
+- By default, seeding is allowed only when `FIREBASE_PROJECT_ID` contains one of `test`, `dev`, `staging`, `sandbox`, `demo`.
+- Use `--force` only when you intentionally want to seed a non-test project.
+- `--admin-email` must resolve to an existing Firebase Auth user, otherwise the command fails.
 
 ## Testing and Quality
 
