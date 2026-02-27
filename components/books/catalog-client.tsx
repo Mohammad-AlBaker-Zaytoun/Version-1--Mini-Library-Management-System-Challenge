@@ -4,8 +4,9 @@ import { Search, SlidersHorizontal, X } from 'lucide-react';
 import type { Route } from 'next';
 import type { ReadonlyURLSearchParams } from 'next/navigation';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { AiCatalogRecommendationCard } from '@/components/books/ai-catalog-recommendation-card';
 import { useAuth } from '@/components/providers/auth-provider';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ import type {
   Book,
   BookAvailability,
   BooksListResponse,
+  CatalogAiRecommendation,
   UserProfile,
 } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -270,9 +272,14 @@ export function CatalogClient() {
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [recommendation, setRecommendation] = useState<CatalogAiRecommendation | null>(null);
+  const [recommendationError, setRecommendationError] = useState<string | null>(null);
+  const [isRecommendationLoading, setIsRecommendationLoading] = useState(false);
 
   const hasLoadedOnceRef = useRef(false);
   const requestIdRef = useRef(0);
+  const recommendationRequestIdRef = useRef(0);
+  const hasRequestedRecommendationRef = useRef<string | null>(null);
 
   const queryString = searchParams.toString();
   const urlState = useMemo(() => parseCatalogQueryState(searchParams), [searchParams]);
@@ -392,6 +399,62 @@ export function CatalogClient() {
     urlState.tags,
   ]);
 
+  const fetchRecommendation = useCallback(async (): Promise<void> => {
+    if (!profile?.uid) {
+      setRecommendation(null);
+      setRecommendationError(null);
+      return;
+    }
+
+    const requestId = ++recommendationRequestIdRef.current;
+    setIsRecommendationLoading(true);
+    setRecommendationError(null);
+
+    try {
+      const response = await authFetch('/api/catalog/ai-recommendation', {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error(await readApiError(response, 'Unable to load AI recommendation'));
+      }
+
+      const payload = (await response.json()) as CatalogAiRecommendation;
+      if (requestId !== recommendationRequestIdRef.current) {
+        return;
+      }
+
+      setRecommendation(payload);
+      hasRequestedRecommendationRef.current = profile.uid;
+    } catch (cause) {
+      if (requestId !== recommendationRequestIdRef.current) {
+        return;
+      }
+
+      setRecommendationError(getErrorMessage(cause, 'Unable to load AI recommendation'));
+    } finally {
+      if (requestId === recommendationRequestIdRef.current) {
+        setIsRecommendationLoading(false);
+      }
+    }
+  }, [profile?.uid]);
+
+  useEffect(() => {
+    if (!profile?.uid) {
+      hasRequestedRecommendationRef.current = null;
+      setRecommendation(null);
+      setRecommendationError(null);
+      setIsRecommendationLoading(false);
+      return;
+    }
+
+    if (hasRequestedRecommendationRef.current === profile.uid) {
+      return;
+    }
+
+    void fetchRecommendation();
+  }, [fetchRecommendation, profile?.uid]);
+
   function updateFilter<Key extends keyof CatalogFilters>(key: Key, value: CatalogFilters[Key]) {
     setFilters((current) => ({ ...current, [key]: value }));
   }
@@ -413,6 +476,34 @@ export function CatalogClient() {
   function resetFilters() {
     setFilters(EMPTY_FILTERS);
     router.replace(pathname as Route, { scroll: false });
+  }
+
+  function focusRecommendationInCatalog() {
+    const suggested = recommendation?.recommendedBook;
+    if (!suggested) {
+      return;
+    }
+
+    const nextFilters: CatalogFilters = {
+      q: suggested.title,
+      author: suggested.author,
+      genre: '',
+      tags: '',
+      availability: '',
+      overdueOnly: false,
+    };
+
+    setFilters(nextFilters);
+    const nextQuery = createQueryString({
+      ...nextFilters,
+      page: 1,
+    });
+    const nextHref = nextQuery ? `${pathname}?${nextQuery}` : pathname;
+    const currentHref = queryString ? `${pathname}?${queryString}` : pathname;
+
+    if (nextHref !== currentHref) {
+      router.replace(nextHref as Route, { scroll: false });
+    }
   }
 
   async function handleCirculation(book: Book, action: 'checkout' | 'checkin') {
@@ -446,6 +537,7 @@ export function CatalogClient() {
 
       await response.json();
       setRefreshTick((current) => current + 1);
+      await fetchRecommendation();
     } catch (cause) {
       setMutationError(getErrorMessage(cause, `Unable to ${action} book`));
     } finally {
@@ -569,6 +661,14 @@ export function CatalogClient() {
         </form>
       </Card>
 
+      <AiCatalogRecommendationCard
+        recommendation={recommendation}
+        isLoading={isRecommendationLoading}
+        error={recommendationError}
+        onRefresh={fetchRecommendation}
+        onFocusRecommendation={focusRecommendationInCatalog}
+      />
+
       {error ? (
         <Card className="space-y-3 border-red-200 bg-red-50/80">
           <p className="text-sm font-semibold text-red-700">Catalog request failed</p>
@@ -625,7 +725,7 @@ export function CatalogClient() {
                   )}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-lg font-semibold leading-snug text-[var(--text-primary)]">
+                    <h3 className="text-lg leading-snug font-semibold text-[var(--text-primary)]">
                       {book.title}
                     </h3>
                     <div className="flex flex-col items-end gap-1">
@@ -652,7 +752,8 @@ export function CatalogClient() {
                   {book.availability === 'checked_out' ? (
                     <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)]/50 p-2">
                       <p className="text-xs text-[var(--text-secondary)]">
-                        Borrower: <span className="font-semibold">{book.borrowedByName ?? 'Unknown'}</span>
+                        Borrower:{' '}
+                        <span className="font-semibold">{book.borrowedByName ?? 'Unknown'}</span>
                       </p>
                       <p
                         className={cn(
@@ -660,7 +761,9 @@ export function CatalogClient() {
                           overdue ? 'font-semibold text-[#c43f32]' : 'text-[var(--text-secondary)]',
                         )}
                       >
-                        {dueDate ? `Due ${dueDate}${overdue ? ' (Overdue)' : ''}` : 'Due date unavailable'}
+                        {dueDate
+                          ? `Due ${dueDate}${overdue ? ' (Overdue)' : ''}`
+                          : 'Due date unavailable'}
                       </p>
                     </div>
                   ) : (
@@ -693,7 +796,9 @@ export function CatalogClient() {
                       variant={actionState.action === 'checkin' ? 'secondary' : 'primary'}
                       disabled={actionState.disabled || Boolean(busyBookId)}
                       loading={isBookBusy}
-                      loadingText={actionState.action === 'checkin' ? 'Checking in...' : 'Checking out...'}
+                      loadingText={
+                        actionState.action === 'checkin' ? 'Checking in...' : 'Checking out...'
+                      }
                       onClick={() => {
                         if (actionState.action !== 'none') {
                           void handleCirculation(book, actionState.action);
