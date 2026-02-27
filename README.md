@@ -4,7 +4,7 @@
 
 Interview-focused, incremental implementation of a mobile-first library platform built with Next.js, Firebase, and practical AI features.
 
-Current status: **PR11 Dashboard + Catalog AI Insights**.
+Current status: **PR12 Protected Route Group + App Shell**.
 
 ## Goals
 
@@ -29,6 +29,7 @@ Current status: **PR11 Dashboard + Catalog AI Insights**.
   - Google SSO login/logout
   - session cookie sync
   - protected routes via `proxy.ts`
+  - protected page group layout for authenticated screens
   - roles: `admin`, `member`
 - Book management:
   - admin CRUD at `/admin/books`
@@ -161,6 +162,7 @@ erDiagram
 9. `chore/09-quality-ci-readme-final`
 10. `chore/10-firestore-seeding`
 11. `feat/11-dashboard-catalog-ai-insights`
+12. `feat/12-protected-layout-app-shell`
 
 ## Environment Variables
 
