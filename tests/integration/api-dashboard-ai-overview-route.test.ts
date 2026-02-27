@@ -12,7 +12,7 @@ vi.mock('@/lib/auth/api-auth', () => ({
   requireApiUser: requireApiUserMock,
 }));
 
-vi.mock('@/lib/services/ai-insights', () => ({
+vi.mock('@/lib/services/ai', () => ({
   generateDashboardInsight: generateDashboardInsightMock,
 }));
 

@@ -1,6 +1,6 @@
 import { getAdminDb } from '@/lib/firebase/admin';
 import { catalogAiSuggestionInputSchema } from '@/lib/schemas/ai';
-import { generateCatalogSuggestion } from '@/lib/services/ai-insights';
+import { generateCatalogSuggestion } from '@/lib/services/ai';
 import type {
   ApiUserContext,
   Book,

@@ -4,7 +4,7 @@
 
 Interview-focused, incremental implementation of a mobile-first library platform built with Next.js, Firebase, and practical AI features.
 
-Current status: **PR16 History Component Relocation**.
+Current status: **PR17 AI Service Consolidation**.
 
 ## Goals
 
@@ -169,6 +169,7 @@ erDiagram
 14. `refactor/14-catalog-componentization`
 15. `chore/15-seo-readme-polish`
 16. `refactor/16-history-component-relocation`
+17. `refactor/17-ai-service-consolidation`
 
 ## Environment Variables
 
