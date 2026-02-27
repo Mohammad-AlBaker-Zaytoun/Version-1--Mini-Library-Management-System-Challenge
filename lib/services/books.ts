@@ -13,6 +13,18 @@ function normalizeOptional(value?: string): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
+function sortByUpdatedAtDesc(items: Book[]): Book[] {
+  return [...items].sort((first, second) => second.updatedAt.localeCompare(first.updatedAt));
+}
+
+function isMissingIndexError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return error.message.toLowerCase().includes('requires an index');
+}
+
 export async function createBook(input: BookWriteInput, actorUid: string): Promise<Book> {
   const now = nowIso();
   const tags = normalizeTags(input.tags);
@@ -102,13 +114,26 @@ export async function deleteBook(bookId: string): Promise<void> {
 }
 
 export async function searchBooks(query: BooksQueryInput): Promise<BooksListResponse> {
-  const snapshot = await getAdminDb()
-    .collection(BOOKS_COLLECTION)
-    .orderBy('updatedAt', 'desc')
-    .limit(500)
-    .get();
+  const booksCollection = getAdminDb().collection(BOOKS_COLLECTION);
 
-  const allBooks = snapshot.docs.map((doc) => doc.data() as Book);
+  let snapshot;
+  try {
+    snapshot = query.availability
+      ? await booksCollection
+          .where('availability', '==', query.availability)
+          .orderBy('updatedAt', 'desc')
+          .limit(600)
+          .get()
+      : await booksCollection.orderBy('updatedAt', 'desc').limit(600).get();
+  } catch (error) {
+    if (!query.availability || !isMissingIndexError(error)) {
+      throw error;
+    }
+
+    snapshot = await booksCollection.where('availability', '==', query.availability).limit(600).get();
+  }
+
+  const allBooks = sortByUpdatedAtDesc(snapshot.docs.map((doc) => doc.data() as Book));
   const filtered = filterBooks(allBooks, query);
   const paginated = paginate(filtered, query.page, query.limit);
 

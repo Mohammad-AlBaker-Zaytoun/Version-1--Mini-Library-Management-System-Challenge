@@ -2,7 +2,7 @@
 
 Incremental, interview-focused project scaffold for building a mobile-first library platform with Next.js + Firebase + AI.
 
-Current status: **PR4 Book CRUD core** (admin books management UI + validated `/api/books` endpoints + Firestore persistence with audit fields).
+Current status: **PR5 Search + Filters** (mobile-first catalog discovery UI with debounced URL-bound filters, pagination, and tag-aware server search).
 
 ## Goals
 
@@ -18,7 +18,7 @@ Current status: **PR4 Book CRUD core** (admin books management UI + validated `/
 - Gemini API features
 - Vercel deployment
 
-## Current Scope (PR4)
+## Current Scope (PR5)
 
 - Next.js project initialized
 - Tailwind CSS + global theme tokens
@@ -51,6 +51,19 @@ Current status: **PR4 Book CRUD core** (admin books management UI + validated `/
     - `DELETE /api/books/:id`
   - Zod validation for reads/writes
   - Firestore book service with audit fields (`createdByUid`, `updatedByUid`, timestamps)
+- Catalog discoverability (PR5):
+  - mobile-first searchable catalog UI at `/catalog`
+  - debounced query updates (title/author/genre/tags/availability)
+  - URL-synced filter state and pagination (`page` param)
+  - no-result and error states with retry/reset actions
+  - server-side filtering contract for:
+    - `q`
+    - `author`
+    - `genre`
+    - `tags` (comma-separated)
+    - `availability`
+    - `page`
+    - `limit`
 - SEO baseline:
   - root and per-page metadata
   - OpenGraph/Twitter cards
@@ -135,6 +148,18 @@ After signing in once with Google:
 pnpm bootstrap-admin --email=you@example.com
 # or
 pnpm bootstrap-admin --uid=YOUR_FIREBASE_UID
+```
+
+## Firestore Indexes
+
+Catalog search uses an index for availability-filtered, recency-sorted book queries:
+
+- `books`: `availability` (ASC) + `updatedAt` (DESC)
+
+Deploy indexes with:
+
+```bash
+firebase deploy --only firestore:indexes
 ```
 
 ## Quality Commands
